@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <UsingTask
+    TaskName="XamlOptimizerTask"
+    AssemblyFile="$(MSBuildThisFileDirectory)..\tools\Sundew.Xaml.Optimizer.dll"/>
+
+  <Target Name="OptimizeXamlResources" BeforeTargets="XamlMarkupCompilePass1;MarkupCompilePass1;_FindXamlGFiles"
+          Condition="!$(DefineConstants.Contains('DISABLE_SXO')) AND $(DesignTimeBuild) != true AND $(BuildingProject) == true">
+    <CreateItem Include="@(EmbeddedResource)" Condition="'%(Extension)' == '.xaml'">
+      <Output TaskParameter="Include" ItemName="EmbeddedXamlResource"/>
+    </CreateItem>
+    <XamlOptimizerTask
+      PackageReferences="@(PackageReference)"
+      TargetPlatformIdentifier="$(TargetPlatformIdentifier)"
+      ApplicationDefinitions="@(ApplicationDefinition)"
+      Pages="@(Page)"
+      EmbeddedXamlResources="@(EmbeddedXamlResource)"
+      ProjectDirectory="$(MSBuildProjectDirectory)"
+      IntermediateOutputPath="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)\sxo"
+      SolutionDirectory="$(SolutionDir)">
+      <Output ItemName="ObsoletePages" TaskParameter="ObsoletePages"/>
+      <Output ItemName="OptimizedPages" TaskParameter="OptimizedPages"/>
+      <Output ItemName="ObsoleteEmbeddedXamlResources" TaskParameter="ObsoleteEmbeddedXamlResources"/>
+      <Output ItemName="OptimizedEmbeddedXamlResources" TaskParameter="OptimizedEmbeddedXamlResources"/>
+      <Output ItemName="ObsoleteApplicationDefinitions" TaskParameter="ObsoleteApplicationDefinitions"/>
+      <Output ItemName="OptimizedApplicationDefinitions" TaskParameter="OptimizedApplicationDefinitions"/>
+      <Output ItemName="NewPages" TaskParameter="NewPages"/>
+      <Output ItemName="NewEmbeddedResources" TaskParameter="NewEmbeddedResources"/>
+      <Output ItemName="NewCompiles" TaskParameter="NewCompiles"/>
+    </XamlOptimizerTask>
+    <ItemGroup>
+      <Page Remove="@(ObsoletePages)"/>
+      <Page Include="@(OptimizedPages)"/>
+      <EmbeddedResource Remove="@(ObsoleteEmbeddedXamlResources)"/>
+      <EmbeddedResource Include="@(OptimizedEmbeddedXamlResources)"/>
+      <ApplicationDefinition Remove="@(ObsoleteApplicationDefinitions)"/>
+      <ApplicationDefinition Include="@(OptimizedApplicationDefinitions)"/>
+      <Page Include="@(NewPages)"/>
+      <EmbeddedResource Include="@(NewEmbeddedResources)"/>
+      <Compile Include="@(NewCompiles)"/>
+    </ItemGroup>
+  </Target>
+</Project>

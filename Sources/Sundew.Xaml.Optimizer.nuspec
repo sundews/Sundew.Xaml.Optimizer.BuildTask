@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/10/nuspec.xsd">
+  <metadata>
+    <id>Sundew.Xaml.Optimizer</id>
+    <version>1.0.0</version>
+    <authors>Kim Hugener-Ohlsen</authors>
+    <owners>Kim Hugener-Ohlsen</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>See following link for samples:
+https://github.com/hugener/Sundew.Xaml.Optimizer.Sample
+See following link for current optimizations:
+https://github.com/hugener/Sundew.Xaml.Optimizations
+See following link for implementing custom optimizations:
+https://github.com/hugener/Sundew.Xaml.Optimization</description>
+    <summary>Xaml Optimization tool for MsBuild.</summary>
+    <releaseNotes>1.0.0 - First release</releaseNotes>
+    <copyright>Hukano</copyright>
+    <language>en-US</language>
+    <dependencies>
+      <dependency id="Sundew.Base" version="3.3.8" exclude="all"/>
+      <dependency id="Sundew.Xaml.Optimization" version="1.0.0" exclude="all"/>
+      <dependency id="Newtonsoft.Json" version="12.0.1" exclude="all"/>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="Sundew.Xaml.Optimizer\bin\Release\Sundew.Xaml.Optimizer.targets" target="build\Sundew.Xaml.Optimizer.targets" />
+    <file src="Sundew.Xaml.Optimizer\bin\Release\Newtonsoft.Json.dll" target="tools\Newtonsoft.Json.dll" />
+    <file src="Sundew.Xaml.Optimizer\bin\Release\Sundew.Base.dll" target="tools\Sundew.Base.dll" />
+    <file src="Sundew.Xaml.Optimizer\bin\Release\Sundew.Xaml.Optimization.dll" target="tools\Sundew.Xaml.Optimization.dll" />
+    <file src="Sundew.Xaml.Optimizer\bin\Release\Sundew.Xaml.Optimizer.dll" target="tools\Sundew.Xaml.Optimizer.dll" />
+    <file src="Sundew.Xaml.Optimizer\bin\Release\Sundew.Xaml.Optimizer.xml" target="tools\Sundew.Xaml.Optimizer.xml" />
+  </files>
+</package>
