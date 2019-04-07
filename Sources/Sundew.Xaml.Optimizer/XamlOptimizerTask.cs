@@ -15,6 +15,7 @@ namespace Sundew.Xaml.Optimizer
     using Microsoft.Build.Utilities;
     using Sundew.Base.Collections;
     using Sundew.Xaml.Optimization;
+    using Sundew.Xaml.Optimization.Xml;
     using Sundew.Xaml.Optimizer.Build;
     using Sundew.Xaml.Optimizer.Factory;
     using Sundew.Xaml.Optimizer.Logging;
@@ -26,6 +27,11 @@ namespace Sundew.Xaml.Optimizer
     /// <seealso cref="Microsoft.Build.Utilities.Task" />
     public sealed class XamlOptimizerTask : Task
     {
+        /// <summary>Gets or sets the reference paths.</summary>
+        /// <value>The reference paths.</value>
+        [Required]
+        public ITaskItem[] ReferencePaths { get; set; }
+
         /// <summary>Gets or sets the package references.</summary>
         /// <value>The package references.</value>
         [Required]
@@ -161,17 +167,18 @@ namespace Sundew.Xaml.Optimizer
         {
             this.Log.LogMessage(MessageImportance.Normal, LogMessages.StartingOptimization);
             var xamlPlatform = XamlPlatformProvider.DefectFramework(this.TargetPlatformIdentifier, this.PackageReferences);
-            var frameworkXmlDefinitions = XamPlatformInfoProvider.GetFrameworkXmlDefinitions(xamlPlatform);
+            var frameworkXmlDefinitions = XamlPlatformInfoProvider.GetXamlPlatformInfo(xamlPlatform);
             var xamlOptimizerFactory = new XamlOptimizerFactory(new MsBuildXamlOptimizerFactoryLogger(this.Log));
             var xamlOptimizers = xamlOptimizerFactory.CreateXamlOptimizers(this.ProjectDirectory, xamlPlatform, frameworkXmlDefinitions, this.SolutionDirectory).ToArray();
+            var assemblyReferences = new AssemblyReferencesLazyList(this.ReferencePaths);
 
             var newCompiles = new List<string>();
             var newPages = new List<string>();
             var newEmbeddedResources = new List<string>();
             var intermediateDirectory = new DirectoryInfo(this.IntermediateOutputPath);
-            var pagesTaskItemChanges = this.OptimizeXaml(this.Pages, intermediateDirectory, xamlOptimizers, newCompiles, newPages, newEmbeddedResources);
-            var embeddedXamlResourcesTaskItemChanges = this.OptimizeXaml(this.EmbeddedXamlResources, intermediateDirectory, xamlOptimizers, newCompiles, newPages, newEmbeddedResources);
-            var applicationDefinitionTaskItemChanges = this.OptimizeXaml(this.ApplicationDefinitions, intermediateDirectory, xamlOptimizers, newCompiles, newPages, newEmbeddedResources);
+            var pagesTaskItemChanges = this.OptimizeXaml(this.Pages, intermediateDirectory, xamlOptimizers, assemblyReferences, newCompiles, newPages, newEmbeddedResources);
+            var embeddedXamlResourcesTaskItemChanges = this.OptimizeXaml(this.EmbeddedXamlResources, intermediateDirectory, xamlOptimizers, assemblyReferences, newCompiles, newPages, newEmbeddedResources);
+            var applicationDefinitionTaskItemChanges = this.OptimizeXaml(this.ApplicationDefinitions, intermediateDirectory, xamlOptimizers, assemblyReferences, newCompiles, newPages, newEmbeddedResources);
 
             this.ObsoletePages = pagesTaskItemChanges.ToArray(x => x.RemoveTaskItem);
             this.OptimizedPages = pagesTaskItemChanges.ToArray(x => x.IncludeTaskItem);
@@ -202,6 +209,7 @@ namespace Sundew.Xaml.Optimizer
             ITaskItem[] taskItems,
             DirectoryInfo sxoDirectory,
             IReadOnlyCollection<IXamlOptimizer> xamlOptimizers,
+            IReadOnlyList<IAssemblyReference> assemblyReferences,
             IList<string> newCompiles,
             IList<string> newPages,
             IList<string> newEmbeddedResources)
@@ -216,7 +224,7 @@ namespace Sundew.Xaml.Optimizer
 
                 foreach (var xamlOptimizer in xamlOptimizers)
                 {
-                    var result = xamlOptimizer.Optimize(fileInfo, xDocument, sxoDirectory);
+                    var result = xamlOptimizer.Optimize(xDocument, fileInfo, sxoDirectory, assemblyReferences);
                     if (result)
                     {
                         xDocument = result.Value.XDocument;

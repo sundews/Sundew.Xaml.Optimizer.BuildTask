@@ -10,6 +10,7 @@
       <Output TaskParameter="Include" ItemName="EmbeddedXamlResource"/>
     </CreateItem>
     <XamlOptimizerTask
+      ReferencePaths="@(ReferencePath)"
       PackageReferences="@(PackageReference)"
       TargetPlatformIdentifier="$(TargetPlatformIdentifier)"
       ApplicationDefinitions="@(ApplicationDefinition)"

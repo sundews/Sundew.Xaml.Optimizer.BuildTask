@@ -2,9 +2,10 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/10/nuspec.xsd">
   <metadata>
     <id>Sundew.Xaml.Optimizer</id>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
     <authors>Kim Hugener-Ohlsen</authors>
     <owners>Kim Hugener-Ohlsen</owners>
+    <developmentDependency>true</developmentDependency>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>See following link for samples:
 https://github.com/hugener/Sundew.Xaml.Optimizer.Sample
@@ -13,14 +14,10 @@ https://github.com/hugener/Sundew.Xaml.Optimizations
 See following link for implementing custom optimizations:
 https://github.com/hugener/Sundew.Xaml.Optimization</description>
     <summary>Xaml Optimization tool for MsBuild.</summary>
-    <releaseNotes>1.0.0 - First release</releaseNotes>
+    <releaseNotes>2.0.0 - Adds support for Sundew.Xaml.Optimizations 2.0.0
+1.0.0 - First release</releaseNotes>
     <copyright>Hukano</copyright>
     <language>en-US</language>
-    <dependencies>
-      <dependency id="Sundew.Base" version="3.3.8" exclude="all"/>
-      <dependency id="Sundew.Xaml.Optimization" version="1.0.0" exclude="all"/>
-      <dependency id="Newtonsoft.Json" version="12.0.1" exclude="all"/>
-    </dependencies>
   </metadata>
   <files>
     <file src="Sundew.Xaml.Optimizer\bin\Release\Sundew.Xaml.Optimizer.targets" target="build\Sundew.Xaml.Optimizer.targets" />
