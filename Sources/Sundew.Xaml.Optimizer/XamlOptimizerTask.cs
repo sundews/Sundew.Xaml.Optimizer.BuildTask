@@ -27,6 +27,17 @@ namespace Sundew.Xaml.Optimizer
     /// <seealso cref="Microsoft.Build.Utilities.Task" />
     public sealed class XamlOptimizerTask : Task
     {
+        private const string PackageReference = "PackageReference";
+        private const string Packages = "packages";
+
+        /// <summary>Gets or sets the nuget package root.</summary>
+        /// <value>The nuget package root.</value>
+        public string NuGetPackageRoot { get; set; }
+
+        /// <summary>Gets or sets the nuget project style.</summary>
+        /// <value>The nuget project style.</value>
+        public string NuGetProjectStyle { get; set; }
+
         /// <summary>Gets or sets the reference paths.</summary>
         /// <value>The reference paths.</value>
         [Required]
@@ -169,7 +180,10 @@ namespace Sundew.Xaml.Optimizer
             var xamlPlatform = XamlPlatformProvider.DefectFramework(this.TargetPlatformIdentifier, this.PackageReferences);
             var frameworkXmlDefinitions = XamlPlatformInfoProvider.GetXamlPlatformInfo(xamlPlatform);
             var xamlOptimizerFactory = new XamlOptimizerFactory(new MsBuildXamlOptimizerFactoryLogger(this.Log));
-            var xamlOptimizers = xamlOptimizerFactory.CreateXamlOptimizers(this.ProjectDirectory, xamlPlatform, frameworkXmlDefinitions, this.SolutionDirectory).ToArray();
+            var packagesDirectory = this.NuGetProjectStyle == PackageReference
+                ? this.NuGetPackageRoot
+                : Path.Combine(this.SolutionDirectory, Packages);
+            var xamlOptimizers = xamlOptimizerFactory.CreateXamlOptimizers(this.ProjectDirectory, xamlPlatform, frameworkXmlDefinitions, packagesDirectory).ToArray();
             var assemblyReferences = new AssemblyReferencesLazyList(this.ReferencePaths);
 
             var newCompiles = new List<string>();

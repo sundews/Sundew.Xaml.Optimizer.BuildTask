@@ -27,6 +27,11 @@ namespace Sundew.Xaml.Optimizer.Factory
         private const string BasePathText = "BasePath";
         private const string RemainingPathText = "RemainingPath";
         private const string AsteriskText = "*";
+        private const string SortAtBeginningCharacter = "\0xFFFF";
+        private const string VersionWithPrerelease = "VersionWithPrerelease";
+        private const string VersionWithRevision = "VersionWithRevision";
+        private const string Prerelease = "Prerelease";
+        private static readonly Regex VersionRegex = new Regex(@"(?<VersionWithRevision>(?<Major>\d+)\.(?<Minor>\d+)\.(?<Build>\d+)\.(?<Revision>\d+))|(?<VersionWithPrerelease>(?<Major>\d+)\.(?<Minor>\d+)\.(?<Build>\d+))(?<Prerelease>.*)");
         private static readonly Regex LatestVersionRegex = new Regex(@"(?<BasePath>.+)(\?LATEST_VERSION\?)(?<RemainingPath>.+)");
         private readonly IXamlOptimizerFactoryReporter xamlOptimizerFactoryReporter;
 
@@ -41,20 +46,20 @@ namespace Sundew.Xaml.Optimizer.Factory
         /// <param name="projectDirectory">The project directory.</param>
         /// <param name="xamlPlatform">The xaml platform.</param>
         /// <param name="xamlPlatformInfo">The framework xml definitions.</param>
-        /// <param name="solutionDirectory">The packages directory.</param>
+        /// <param name="packagesDirectory">The packages directory.</param>
         /// <returns>The optimization runners.</returns>
         public IEnumerable<IXamlOptimizer> CreateXamlOptimizers(
             string projectDirectory,
             XamlPlatform xamlPlatform,
             XamlPlatformInfo xamlPlatformInfo,
-            string solutionDirectory)
+            string packagesDirectory)
         {
             var sxoSettings = this.GetSettings(projectDirectory);
             var optimizerLibraries = sxoSettings.Libraries.Select(libraryPath =>
             {
                 if (!Path.IsPathRooted(libraryPath))
                 {
-                    libraryPath = Path.Combine(solutionDirectory, libraryPath);
+                    libraryPath = Path.Combine(packagesDirectory, libraryPath);
                 }
 
                 var match = LatestVersionRegex.Match(libraryPath);
@@ -66,14 +71,30 @@ namespace Sundew.Xaml.Optimizer.Factory
                         .EnumerateDirectories(baseDirectory, Path.GetFileName(basePath) + AsteriskText)
                         .Select(path =>
                         {
-                            if (Version.TryParse(path.Substring(basePath.Length), out var version))
+                            var versionMatch = VersionRegex.Match(path.Substring(basePath.Length));
+                            if (versionMatch.Success)
                             {
-                                return new { Path = path, Version = version };
+                                var group = versionMatch.Groups[VersionWithRevision];
+                                if (group.Success)
+                                {
+                                    return new { Path = path, Version = Version.Parse(group.Value), Prerelease = SortAtBeginningCharacter };
+                                }
+
+                                group = versionMatch.Groups[VersionWithPrerelease];
+                                if (group.Success)
+                                {
+                                    var prerelease = versionMatch.Groups[Prerelease].Value;
+                                    return new
+                                    {
+                                        Path = path, Version = Version.Parse(group.Value),
+                                        Prerelease = string.IsNullOrEmpty(prerelease) ? SortAtBeginningCharacter : prerelease,
+                                    };
+                                }
                             }
 
-                            return new { Path = path, Version = new Version(0, 0, 0, 0) };
+                            return new { Path = path, Version = new Version(0, 0, 0, 0), Prerelease = string.Empty };
                         })
-                        .OrderByDescending(pathAndVersion => pathAndVersion.Version)
+                        .OrderByDescending(pathAndVersion => pathAndVersion.Version).ThenByDescending(pathAndVersion => pathAndVersion.Prerelease)
                         .FirstOrDefault()
                         ?.Path;
                     if (suggestedPath != null)
