@@ -1,0 +1,84 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <_SundewXamlOptimizerMerged>$(MSBuildThisFileDirectory)..\tools\Sundew.Xaml.Optimizer.BuildTask.m.dll</_SundewXamlOptimizerMerged>
+    <_SundewXamlOptimizer Condition="Exists($(_SundewXamlOptimizerMerged))">$(_SundewXamlOptimizerMerged)</_SundewXamlOptimizer>
+    <_SundewXamlOptimizer Condition="'$(_SundewXamlOptimizer)'==''">$(MSBuildThisFileDirectory)..\tools\Sundew.Xaml.Optimizer.BuildTask.dll</_SundewXamlOptimizer>
+  </PropertyGroup>
+  <UsingTask
+    TaskName="XamlOptimizerTask"
+    AssemblyFile="$(_SundewXamlOptimizer)"
+    TaskFactory="TaskHostFactory"/>
+
+  <Target Name="OptimizeXamlResources" BeforeTargets="XamlMarkupCompilePass1;MarkupCompilePass1;_FindXamlGFiles"
+          Condition="!$(DefineConstants.Contains('DISABLE_SXO')) AND $(DesignTimeBuild) != true AND $(BuildingProject) == true">
+    <CreateItem Include="@(EmbeddedResource)" Condition="'%(Extension)' == '.xaml'">
+      <Output TaskParameter="Include" ItemName="EmbeddedXamlResource"/>
+    </CreateItem>
+    <XamlOptimizerTask
+      Optimizers="@(Sxo)"
+      ReferencePaths="@(ReferencePath)"
+      PackageReferences="@(PackageReference)"
+      TargetPlatformIdentifier="$(TargetPlatformIdentifier)"
+      ApplicationDefinitions="@(ApplicationDefinition)"
+      Pages="@(Page)"
+      EmbeddedXamlResources="@(EmbeddedXamlResource)"
+      AvaloniaXaml="@(AvaloniaXaml)"
+      MauiXaml="@(MauiXaml)"
+      Compiles="@(Compile)"
+      ProjectDirectory="$(MSBuildProjectDirectory)"
+      AssemblyName="$(AssemblyName)"
+      RootNamespace="$(RootNamespace)"
+      IntermediateOutputPath="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)\sxo"
+      SolutionDirectory="$(SolutionDir)"
+      UseWinUI="$(UseWinUI)"
+      UseWPF="$(UseWPF)"
+      UseMaui="$(UseMaui)"
+      Debug="$(DefineConstants.Contains('DEBUG_SXO'))">
+	  <Output ItemName="ObsoletePages" TaskParameter="ObsoletePages"/>
+	  <Output ItemName="OptimizedPages" TaskParameter="OptimizedPages"/>
+	  <Output ItemName="ObsoleteAvaloniaXaml" TaskParameter="ObsoleteAvaloniaXaml"/>
+      <Output ItemName="OptimizedAvaloniaXaml" TaskParameter="OptimizedAvaloniaXaml"/>
+	  <Output ItemName="ObsoleteMauiXaml" TaskParameter="ObsoleteMauiXaml"/>
+	  <Output ItemName="OptimizedMauiXaml" TaskParameter="OptimizedMauiXaml"/>
+      <Output ItemName="ObsoleteEmbeddedXamlResources" TaskParameter="ObsoleteEmbeddedXamlResources"/>
+      <Output ItemName="OptimizedEmbeddedXamlResources" TaskParameter="OptimizedEmbeddedXamlResources"/>
+      <Output ItemName="ObsoleteApplicationDefinitions" TaskParameter="ObsoleteApplicationDefinitions"/>
+      <Output ItemName="OptimizedApplicationDefinitions" TaskParameter="OptimizedApplicationDefinitions"/>
+	  <Output ItemName="NewPages" TaskParameter="NewPages"/>
+	  <Output ItemName="NewAvaloniaXaml" TaskParameter="NewAvaloniaXaml"/>
+	  <Output ItemName="NewMauiXaml" TaskParameter="NewMauiXaml"/>
+	  <Output ItemName="NewEmbeddedResources" TaskParameter="NewEmbeddedResources"/>
+      <Output ItemName="NewCompiles" TaskParameter="NewCompiles"/>
+      <Output ItemName="NewAdditionalFiles" TaskParameter="NewAdditionalFiles"/>
+    </XamlOptimizerTask>
+    <ItemGroup>
+	  <Page Remove="@(ObsoletePages)"/>
+	  <Page Include="@(OptimizedPages)"/>
+	  <AvaloniaXaml Remove="@(ObsoleteAvaloniaXaml)"/>
+	  <AvaloniaXaml Include="@(OptimizedAvaloniaXaml)"/>
+	  <MauiXaml Remove="@(ObsoleteMauiXaml)"/>
+	  <MauiXaml Include="@(OptimizedMauiXaml)"/>
+      <FileWrites Include="@(OptimizedPages)"/>
+      <EmbeddedResource Remove="@(ObsoleteEmbeddedXamlResources)"/>
+      <EmbeddedResource Include="@(OptimizedEmbeddedXamlResources)"/>
+      <FileWrites Include="@(OptimizedEmbeddedXamlResources)"/>
+      <ApplicationDefinition Remove="@(ObsoleteApplicationDefinitions)"/>
+      <ApplicationDefinition Include="@(OptimizedApplicationDefinitions)"/>
+      <FileWrites Include="@(OptimizedApplicationDefinitions)"/>
+      <AvaloniaXaml Include="@(NewAvaloniaXaml)"/>
+      <FileWrites Include="@(NewAvaloniaXaml)"/>
+	  <MauiXaml Include="@(NewMauiXaml)"/>
+	  <FileWrites Include="@(NewMauiXaml)"/>
+      <Page Include="@(NewPages)"/>
+      <FileWrites Include="@(NewPages)"/>
+      <EmbeddedResource Include="@(NewEmbeddedResources)"/>
+      <FileWrites Include="@(NewEmbeddedResources)"/>
+      <Compile Include="@(NewCompiles)"/>
+      <FileWrites Include="@(NewCompiles)"/>
+      <_GeneratedCodeFiles Include="@(NewCompiles)"/>
+      <AdditionalFiles Include="@(NewAdditionalFiles)"/>
+      <FileWrites Include="@(NewAdditionalFiles)"/>
+    </ItemGroup>
+  </Target>
+</Project>
