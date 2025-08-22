@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/10/nuspec.xsd">
+  <metadata>
+    <id>Sundew.Xaml.Optimizer.BuildTask</id>
+    <version>1.0.0</version>
+    <title></title>
+    <authors>$authors$</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>$description$</description>
+    <developmentDependency>true</developmentDependency>
+    <releaseNotes>$releaseNotes$</releaseNotes>
+	<readme>docs/README.md</readme>
+    <license type="expression">$licenseExpression$</license>
+    <copyright>$copyright$</copyright>
+    <repository type="$repositoryType$" url="$repositoryUrl$"></repository>
+  </metadata>
+  <files>
+    <file src="$packageFiles$\**\*.*" target=""/>
+    <file src="$packageFiles$\build\*.*" target="buildCrossTargeting"/>
+	<file src="..\..\README.md" target="docs"/>
+  </files>
+</package>

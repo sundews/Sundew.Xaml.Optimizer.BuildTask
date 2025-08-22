@@ -1,0 +1,104 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <NuspecFile>Sundew.Xaml.Optimizer.BuildTask.nuspec</NuspecFile>
+    <OutputPath>bin\$(Configuration)</OutputPath>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <IsTool>true</IsTool>
+    <IncludeBuildOutput>true</IncludeBuildOutput>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <Description>See following link for samples:
+https://github.com/sundews/Sundew.Xaml.Optimizer.Sample
+See following link for current optimizations:
+https://github.com/sundews/Sundew.Xaml.Optimizations
+See following link for implementing custom optimizations:
+https://github.com/sundews/Sundew.Xaml.Optimization</Description>
+    <PackageReleaseNotes>3.0.0 - Changed to .NET Standard 2.0, adds support for Sundew.Xaml.Optimization 3.0.0
+2.0.0 - Adds support for Sundew.Xaml.Optimization 2.0.0
+1.0.0 - First release
+</PackageReleaseNotes>
+    <DocumentationFile>$(OutputPath)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="build\Sundew.Xaml.Optimizer.BuildTask.targets">
+      <PackagePath>build;buildCrossTargeting</PackagePath>
+    </Content>
+    <AdditionalFiles Include="stylecop.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.43">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Build.Framework" Version="16.5.0" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="16.5.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="PolySharp" Version="1.15.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="StyleCop.Analyzers.Unstable" Version="1.2.0.556">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Sundew.Base" Version="15.0.0-u20250815-095250-ci" />
+    <PackageReference Include="Sundew.Packaging.Publish" Version="10.0.9">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Sundew.Xaml.Optimization" Version="3.0.0-u20250822-222054-ci" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+
+  <Target Name="SetNuspecProperties" BeforeTargets="GenerateNuspec">
+    <PropertyGroup>
+      <NuspecProperties>$(NuspecProperties);company=$(Company);description=$(Description);copyright=$(Copyright);authors=$(Authors);version=$(PackageVersion);repositoryUrl=$(RepositoryUrl);releaseNotes=$(PackageReleaseNotes);repositoryType=$(RepositoryType);licenseExpression=$(PackageLicenseExpression);targetFramework=$(TargetFramework);configuration=$(Configuration);projectDir=$(MSBuildProjectDirectory);outputPath=$(OutputPath);packageFiles=$(IntermediateOutputPath)package;supportedOptimizationsVersions=$(SupportedOptimizationsVersions)</NuspecProperties>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="ILRepacker" BeforeTargets="PostBuildEvent" AfterTargets="Build" Condition="$(Configuration.Contains('Release'))">
+    <ItemGroup>
+      <InputAssemblies Include="$(OutputPath)**\*.dll" />
+      <OutputAssemblies Include="$(OutputPath)$(AssemblyName).m.dll" />
+      <OutputAssemblies Include="$(OutputPath)**\Microsoft.Build*.dll" />
+      <OutputAssemblies Include="$(OutputPath)**\System*.dll" />
+      <OutputAssemblies Include="$(OutputPath)Sundew.Xaml.Optimization.dll" />
+      <InputAssemblies Remove="@(OutputAssemblies)" />
+      <InputAssemblies Remove="$(OutputPath)$(AssemblyName).dll" />
+    </ItemGroup>
+
+    <ILRepack DebugInfo="true" Parallel="true" Internalize="true" InputAssemblies="$(OutputPath)\$(AssemblyName).dll;@(InputAssemblies)" InternalizeExclude="$(AssemblyName)" TargetKind="Dll" LibraryPath="$(OutputPath)" OutputFile="$(OutputPath)\$(AssemblyName).m.dll" />
+  </Target>
+
+  <Target Name="NoILRepacker" BeforeTargets="PostBuildEvent" AfterTargets="Build" Condition="!$(Configuration.Contains('Release'))">
+    <ItemGroup>
+      <OutputAssemblies Include="$(OutputPath)**\*.dll" />
+      <OutputAssemblies Remove="$(OutputPath)$(AssemblyName).m.dll" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <ItemGroup>
+      <OutputFiles Include="@(OutputAssemblies)" />
+      <BuildFiles Include="$(MSBuildProjectDirectory)\build\**\*.*" />
+      <ContentFiles Include="$(MSBuildProjectDirectory)\content\**\*.*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(IntermediateOutputPath)\package" />
+    <Copy SourceFiles="@(OutputFiles)" DestinationFiles="@(OutputFiles->'$(IntermediateOutputPath)\package\tools\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
+    <Copy SourceFiles="@(BuildFiles)" DestinationFiles="@(BuildFiles->'$(IntermediateOutputPath)\package\build\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
+    <Copy SourceFiles="@(ContentFiles)" DestinationFiles="@(ContentFiles->'$(IntermediateOutputPath)\package\content\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
+  </Target>
+  
+</Project>
