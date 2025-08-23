@@ -7,15 +7,7 @@
 
 namespace Sundew.Xaml.Optimizer.BuildTask;
 
-using System.Xml.Linq;
-
 internal static class Constants
 {
-    public const string SundewXamlOptimizationWpfNamespace = "clr-namespace:Sundew.Xaml.Optimizations;assembly=Sundew.Xaml.Wpf";
-    public const string SundewXamlOptimizationUwpNamespace = "clr-namespace:Sundew.Xaml.Optimizations;assembly=Sundew.Xaml.Uwp";
-    public const string SundewXamlOptimizationXfNamespace = "clr-namespace:Sundew.Xaml.Optimizations;assembly=Sundew.Xaml.Xf";
     public const string System = "system";
-    public static readonly XNamespace WpfPresentationNamespace = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
-    public static readonly XNamespace UwpPresentationNamespace = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
-    public static readonly XNamespace XfPresentationNamespace = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
 }
