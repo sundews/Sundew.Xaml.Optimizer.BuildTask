@@ -17,7 +17,7 @@ internal class TaskItemChanges
     /// <summary>Initializes a new instance of the <see cref="TaskItemChanges"/> class.</summary>
     /// <param name="includeTaskItem">The include task item.</param>
     /// <param name="removeTaskItem">The remove task item.</param>
-    public TaskItemChanges(ITaskItem includeTaskItem, ITaskItem removeTaskItem)
+    public TaskItemChanges(ITaskItem? includeTaskItem, ITaskItem removeTaskItem)
     {
         this.IncludeTaskItem = includeTaskItem;
         this.RemoveTaskItem = removeTaskItem;
@@ -29,7 +29,7 @@ internal class TaskItemChanges
     /// <value>
     /// The include task item.
     /// </value>
-    public ITaskItem IncludeTaskItem { get; }
+    public ITaskItem? IncludeTaskItem { get; }
 
     /// <summary>
     /// Gets the remove task item.

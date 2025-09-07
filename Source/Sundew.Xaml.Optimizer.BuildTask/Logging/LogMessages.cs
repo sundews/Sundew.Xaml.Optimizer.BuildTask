@@ -15,9 +15,9 @@ internal static class LogMessages
 
     public const string SettingsFound = "SXO > Using settings: {0}";
 
-    public const string ItemOptimized = "SXO > Optimized item: {0}, with optimizer: {1} took: {2}";
+    public const string ItemsOptimized = "SXO > Items optimized by: {0} took: {1}";
 
-    public const string NothingToOptimize = "SXO > Nothing to optimize for: {0}, for optimizer: {1} took: {2}";
+    public const string NothingToOptimize = "SXO > Nothing to optimize for optimizer: {0} took: {1}";
 
     public const string OptimizationCompleted = "SXO > Optimizer completed";
 }

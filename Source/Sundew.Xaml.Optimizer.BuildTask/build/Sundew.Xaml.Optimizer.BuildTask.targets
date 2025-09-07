@@ -16,7 +16,8 @@
       <Output TaskParameter="Include" ItemName="EmbeddedXamlResource"/>
     </CreateItem>
     <XamlOptimizerTask
-      Optimizers="@(Sxo)"
+	  TreatWarningsAsErrors="$(TreatWarningsAsErrors)"
+	  Optimizers="@(Sxo)"
       ReferencePaths="@(ReferencePath)"
       PackageReferences="@(PackageReference)"
       TargetPlatformIdentifier="$(TargetPlatformIdentifier)"
@@ -55,11 +56,13 @@
     <ItemGroup>
 	  <Page Remove="@(ObsoletePages)"/>
 	  <Page Include="@(OptimizedPages)"/>
+	  <FileWrites Include="@(OptimizedPages)"/>
 	  <AvaloniaXaml Remove="@(ObsoleteAvaloniaXaml)"/>
-	  <AvaloniaXaml Include="@(OptimizedAvaloniaXaml)"/>
+      <AvaloniaXaml Include="@(OptimizedAvaloniaXaml)"/>
+	  <FileWrites Include="@(ObsoleteAvaloniaXaml)"/>
 	  <MauiXaml Remove="@(ObsoleteMauiXaml)"/>
 	  <MauiXaml Include="@(OptimizedMauiXaml)"/>
-      <FileWrites Include="@(OptimizedPages)"/>
+	  <FileWrites Include="@(OptimizedMauiXaml)"/>
       <EmbeddedResource Remove="@(ObsoleteEmbeddedXamlResources)"/>
       <EmbeddedResource Include="@(OptimizedEmbeddedXamlResources)"/>
       <FileWrites Include="@(OptimizedEmbeddedXamlResources)"/>

@@ -49,4 +49,9 @@ internal class AssemblyReference : IAssemblyReference
     public string[] Aliases => this.aliases.Value;
 
     public string this[string name] => this.taskItem.GetMetadata(name);
+
+    public override string ToString()
+    {
+        return this.Id;
+    }
 }

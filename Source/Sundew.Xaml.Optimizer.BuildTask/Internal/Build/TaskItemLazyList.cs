@@ -10,18 +10,18 @@ namespace Sundew.Xaml.Optimizer.BuildTask.Internal.Build;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Microsoft.Build.Framework;
-using Sundew.Base.Collections;
 
 internal class TaskItemLazyList<TItem> : IReadOnlyList<TItem>
 {
     private readonly Lazy<IReadOnlyList<TItem>> items;
 
-    public TaskItemLazyList(ITaskItem[] referencesPaths, Func<ITaskItem, TItem> factory)
+    public TaskItemLazyList(ITaskItem[] referencesPaths, Func<ITaskItem, int, TItem> factory)
     {
         this.items = new Lazy<IReadOnlyList<TItem>>(
-            () => referencesPaths.ToArray(factory),
+            () => referencesPaths.Select(factory).ToArray(),
             LazyThreadSafetyMode.ExecutionAndPublication);
     }
 

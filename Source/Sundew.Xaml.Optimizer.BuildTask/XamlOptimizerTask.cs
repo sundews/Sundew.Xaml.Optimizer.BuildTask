@@ -12,13 +12,15 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
+using Sundew.Base;
 using Sundew.Base.Collections;
+using Sundew.Base.Collections.Linq;
 using Sundew.Xaml.Optimization;
 using Sundew.Xaml.Optimization.Xml;
 using Sundew.Xaml.Optimizer.BuildTask.Factory;
+using Sundew.Xaml.Optimizer.BuildTask.Internal;
 using Sundew.Xaml.Optimizer.BuildTask.Internal.Build;
 using Sundew.Xaml.Optimizer.BuildTask.Logging;
 using Sundew.Xaml.Optimizer.BuildTask.Reflection;
@@ -161,6 +163,11 @@ public sealed class XamlOptimizerTask : Task
     public bool Debug { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether warnings are treated as errors.
+    /// </summary>
+    public bool TreatWarningsAsErrors { get; set; }
+
+    /// <summary>
     /// Gets the optimized Avalonia Xaml.
     /// </summary>
     /// <value>
@@ -252,27 +259,27 @@ public sealed class XamlOptimizerTask : Task
 
     /// <summary>Gets the new pages.</summary>
     [Output]
-    public string[]? NewPages { get; private set; }
+    public ITaskItem[]? NewPages { get; private set; }
 
-    /// <summary>Gets the new avalonia xaml-.</summary>
+    /// <summary>Gets the new avalonia xaml.</summary>
     [Output]
-    public string[]? NewAvaloniaXaml { get; private set; }
+    public ITaskItem[]? NewAvaloniaXaml { get; private set; }
 
-    /// <summary>Gets the new maui xaml-.</summary>
+    /// <summary>Gets the new maui xaml.</summary>
     [Output]
-    public string[]? NewMauiXaml { get; private set; }
+    public ITaskItem[]? NewMauiXaml { get; private set; }
 
     /// <summary>Gets the new embedded resources.</summary>
     [Output]
-    public string[]? NewEmbeddedResources { get; private set; }
+    public ITaskItem[]? NewEmbeddedResources { get; private set; }
 
     /// <summary>Gets the new compiles.</summary>
     [Output]
-    public string[]? NewCompiles { get; private set; }
+    public ITaskItem[]? NewCompiles { get; private set; }
 
     /// <summary>Gets the new additional files.</summary>
     [Output]
-    public string[]? NewAdditionalFiles { get; private set; }
+    public ITaskItem[]? NewAdditionalFiles { get; private set; }
 
     /// <summary>
     /// Executes the xaml resource optimization.
@@ -294,8 +301,13 @@ public sealed class XamlOptimizerTask : Task
             var xamlPlatformInfo = XamlPlatformInfoProvider.GetXamlPlatformInfo(xamlPlatform);
             var logger = new MsBuildLogger(this.Log);
             var xamlOptimizerFactory = new XamlOptimizerFactory(logger);
-            var compiles = new TaskItemLazyList<IFileReference>(this.Compiles, x => new FileReference(x, BuildAction.Compile));
-            var assemblyReferences = new TaskItemLazyList<IAssemblyReference>(this.ReferencePaths, x => new AssemblyReference(x));
+            var compiles = new TaskItemLazyList<TaskItemFileReference>(
+                this.Compiles,
+                (x, index) => new TaskItemFileReference(x, BuildAction.Compile));
+            var assemblyReferences =
+                new TaskItemLazyList<AssemblyReference>(
+                    this.ReferencePaths,
+                    (x, index) => new AssemblyReference(x));
             var intermediateDirectory = new DirectoryInfo(this.IntermediateOutputPath);
             var sxoSettings = new SettingsProvider(logger).GetSettings(this.ProjectDirectory);
             var optimizerPaths = this.Optimizers.Select(x => x.ItemSpec).ToArray();
@@ -323,12 +335,73 @@ public sealed class XamlOptimizerTask : Task
         return true;
     }
 
-    private static string GetLink(ITaskItem taskItem)
+    private static async System.Threading.Tasks.Task AddAdditionalFiles(
+        IReadOnlyCollection<AdditionalFile> additionalFiles,
+        NewItems<List<ITaskItem>> newItems)
     {
-        var link = taskItem.GetMetadata(MetadataNames.Link);
+        foreach (var additionalFile in additionalFiles)
+        {
+            var directory = additionalFile.FileInfo.Directory;
+            if (directory is { Exists: false })
+            {
+                Directory.CreateDirectory(directory.FullName);
+            }
+
+            await FileHelper.WriteAllTextAsync(additionalFile.FileInfo.FullName, additionalFile.Content).ConfigureAwait(false);
+
+            var taskItem = new TaskItem(additionalFile.FileInfo.FullName);
+            if (additionalFile.Link.HasValue())
+            {
+                taskItem.SetMetadata(MetadataNames.Link, additionalFile.Link);
+            }
+
+            switch (additionalFile.ItemType)
+            {
+                case ItemType.Compile:
+                    newItems.CompileItems.Add(taskItem);
+                    break;
+                case ItemType.Page:
+                    newItems.PageItems.Add(taskItem);
+                    break;
+                case ItemType.EmbeddedResource:
+                    newItems.EmbeddedResourceItems.Add(taskItem);
+                    break;
+                case ItemType.AdditionalFile:
+                    newItems.AdditionalFileItems.Add(taskItem);
+                    break;
+                case ItemType.AvaloniaXaml:
+                    newItems.AvaloniaXamlItems.Add(taskItem);
+                    break;
+                case ItemType.MauiXaml:
+                    newItems.MauiXamlItems.Add(taskItem);
+                    break;
+            }
+        }
+    }
+
+    private static List<TaskItemChanges>? GetTaskItems(
+        XamlFileChange xamlFileChange,
+        ApplicationXamlItems<List<TaskItemChanges>> applicationXamlTaskItems)
+    {
+        return xamlFileChange.File.Reference.BuildAction switch
+        {
+            BuildAction.Page => applicationXamlTaskItems.PageItems,
+            BuildAction.AssemblyReference => null,
+            BuildAction.Compile => null,
+            BuildAction.MauiXaml => applicationXamlTaskItems.MauiXamlItems,
+            BuildAction.AvaloniaXaml => applicationXamlTaskItems.AvaloniaXamlItems,
+            BuildAction.EmbeddedResource => applicationXamlTaskItems.EmbeddedResourceItems,
+            BuildAction.ApplicationDefinition => applicationXamlTaskItems.ApplicationDefinition,
+            _ => null,
+        };
+    }
+
+    private static string GetLinkPath(IFileReference fileReference)
+    {
+        var link = fileReference[MetadataNames.Link];
         if (string.IsNullOrEmpty(link))
         {
-            link = taskItem.GetMetadata(MetadataNames.Identity);
+            link = fileReference[MetadataNames.Identity];
         }
 
         return link;
@@ -337,168 +410,185 @@ public sealed class XamlOptimizerTask : Task
     private void Optimize(
         XamlPlatformInfo xamlPlatformInfo,
         XamlOptimizerFactory xamlOptimizerFactory,
-        TaskItemLazyList<IFileReference> compiles,
-        TaskItemLazyList<IAssemblyReference> assemblyReferences,
+        TaskItemLazyList<TaskItemFileReference> compiles,
+        TaskItemLazyList<AssemblyReference> assemblyReferences,
         DirectoryInfo intermediateDirectory,
         IReadOnlyCollection<SxoSettings> sxoSettings,
         IReadOnlyList<string> xamlOptimizerPaths,
         AssemblyResolver assemblyResolver)
     {
-        var pages = this.Pages.ToArray(x => new FileReference(x, BuildAction.Page));
-        var avaloniaXaml = this.AvaloniaXaml.ToArray(x => new FileReference(x, BuildAction.AvaloniaXaml));
-        var mauiXaml = this.MauiXaml.ToArray(x => new FileReference(x, BuildAction.MauiXaml));
-        var embeddedXamlResources = this.EmbeddedXamlResources.ToArray(x => new FileReference(x, BuildAction.EmbeddedResource));
-        var applicationDefinitions = this.ApplicationDefinitions.ToArray(x => new FileReference(x, BuildAction.ApplicationDefinition));
-        var xDocumentProvider = new XDocumentProvider(pages.Concat(embeddedXamlResources, applicationDefinitions));
+        var pages = this.Pages.Select((x, i) => new TaskItemFileReference(x, BuildAction.Page));
+        var avaloniaXaml =
+            this.AvaloniaXaml.Select((x, i) => new TaskItemFileReference(x, BuildAction.AvaloniaXaml));
+        var mauiXaml = this.MauiXaml.Select((x, i) => new TaskItemFileReference(x, BuildAction.MauiXaml));
+        var embeddedXamlResources =
+            this.EmbeddedXamlResources.Select((x, i) => new TaskItemFileReference(x, BuildAction.EmbeddedResource));
+        var applicationDefinitions = this.ApplicationDefinitions.Select((x, i) =>
+            new TaskItemFileReference(x, BuildAction.ApplicationDefinition));
 
-        var projectInfo = new ProjectInfo(this.AssemblyName, this.RootNamespace, intermediateDirectory, assemblyReferences, compiles, xDocumentProvider);
+        var newItems = new NewItems<List<ITaskItem>>(() => new List<ITaskItem>());
+        var pagesData = pages.ToArray(XamlFileProvider.InternalLoadAsync);
+        var avaloniaXamlData = avaloniaXaml.ToArray(XamlFileProvider.InternalLoadAsync);
+        var mauiXamlData = mauiXaml.ToArray(XamlFileProvider.InternalLoadAsync);
+        var embeddedXamlResourcesData = embeddedXamlResources.ToArray(XamlFileProvider.InternalLoadAsync);
+        var applicationDefinitionsData = applicationDefinitions.ToArray(XamlFileProvider.InternalLoadAsync);
+        System.Threading.Tasks.Task.WaitAll(pagesData.Concat(avaloniaXamlData, mauiXamlData, embeddedXamlResourcesData, applicationDefinitionsData));
+        var applicationXamlItems = new ApplicationXamlItems<IEnumerable<TaskItemXamlFile>>(
+            System.Threading.Tasks.Task.WhenAll(pagesData).Result,
+            System.Threading.Tasks.Task.WhenAll(avaloniaXamlData).Result,
+            System.Threading.Tasks.Task.WhenAll(mauiXamlData).Result,
+            System.Threading.Tasks.Task.WhenAll(embeddedXamlResourcesData).Result,
+            System.Threading.Tasks.Task.WhenAll(applicationDefinitionsData).Result);
 
-        var xamlOptimizers = xamlOptimizerFactory.CreateXamlOptimizers(assemblyResolver, xamlPlatformInfo, projectInfo, xamlOptimizerPaths, sxoSettings).ToArray();
-        var newCompiles = new List<string>();
-        var newPages = new List<string>();
-        var newAvaloniaXaml = new List<string>();
-        var newMauiXaml = new List<string>();
-        var newEmbeddedResources = new List<string>();
-        var newAdditionalFiles = new List<string>();
-        var mauiXamlTaskItemChanges = this.OptimizeXaml(this.MauiXaml, mauiXaml, intermediateDirectory, xamlOptimizers, newCompiles, newPages, newAvaloniaXaml, newMauiXaml, newEmbeddedResources, newAdditionalFiles, xDocumentProvider);
-        var avaloniaXamlTaskItemChanges = this.OptimizeXaml(this.AvaloniaXaml, avaloniaXaml, intermediateDirectory, xamlOptimizers, newCompiles, newPages, newAvaloniaXaml, newMauiXaml, newEmbeddedResources, newAdditionalFiles, xDocumentProvider);
-        var pagesTaskItemChanges = this.OptimizeXaml(this.Pages, pages, intermediateDirectory, xamlOptimizers, newCompiles, newPages, newEmbeddedResources, newAvaloniaXaml, newMauiXaml, newAdditionalFiles, xDocumentProvider);
-        var embeddedXamlResourcesTaskItemChanges = this.OptimizeXaml(this.EmbeddedXamlResources, embeddedXamlResources, intermediateDirectory, xamlOptimizers, newCompiles, newPages, newAvaloniaXaml, newMauiXaml, newAdditionalFiles, newEmbeddedResources, xDocumentProvider);
-        var applicationDefinitionTaskItemChanges = this.OptimizeXaml(this.ApplicationDefinitions, applicationDefinitions, intermediateDirectory, xamlOptimizers, newCompiles, newPages, newAvaloniaXaml, newMauiXaml, newEmbeddedResources, newAdditionalFiles, xDocumentProvider);
+        var xamlFileProvider = new XamlFileProvider(
+            applicationXamlItems.PageItems
+                .Concat(
+                    applicationXamlItems.AvaloniaXamlItems,
+                    applicationXamlItems.MauiXamlItems,
+                    applicationXamlItems.EmbeddedResourceItems,
+                    applicationXamlItems.ApplicationDefinition));
 
-        this.ObsoletePages = pagesTaskItemChanges.ToArray(x => x.RemoveTaskItem);
-        this.OptimizedPages = pagesTaskItemChanges.ToArray(x => x.IncludeTaskItem);
-        this.ObsoleteAvaloniaXaml = avaloniaXamlTaskItemChanges.ToArray(x => x.RemoveTaskItem);
-        this.OptimizedAvaloniaXaml = avaloniaXamlTaskItemChanges.ToArray(x => x.IncludeTaskItem);
-        this.ObsoleteMauiXaml = mauiXamlTaskItemChanges.ToArray(x => x.RemoveTaskItem);
-        this.OptimizedMauiXaml = mauiXamlTaskItemChanges.ToArray(x => x.IncludeTaskItem);
-        this.ObsoleteEmbeddedXamlResources = embeddedXamlResourcesTaskItemChanges.ToArray(x => x.RemoveTaskItem);
-        this.OptimizedEmbeddedXamlResources = embeddedXamlResourcesTaskItemChanges.ToArray(x => x.IncludeTaskItem);
-        this.ObsoleteApplicationDefinitions = applicationDefinitionTaskItemChanges.ToArray(x => x.RemoveTaskItem);
-        this.OptimizedApplicationDefinitions = applicationDefinitionTaskItemChanges.ToArray(x => x.IncludeTaskItem);
-        this.NewCompiles = newCompiles.ToArray();
-        this.NewPages = newPages.ToArray();
-        this.NewAvaloniaXaml = newAvaloniaXaml.ToArray();
-        this.NewMauiXaml = newMauiXaml.ToArray();
-        this.NewEmbeddedResources = newEmbeddedResources.ToArray();
-        this.NewAdditionalFiles = newAdditionalFiles.ToArray();
-    }
-
-    private LinkedList<TaskItemChanges> OptimizeXaml(
-        ITaskItem[] taskItems,
-        FileReference[] fileReferences,
-        DirectoryInfo sxoDirectory,
-        IReadOnlyCollection<IXamlOptimizer> xamlOptimizers,
-        IList<string> newCompiles,
-        IList<string> newPages,
-        IList<string> newAvaloniaXaml,
-        IList<string> newMauiXaml,
-        IList<string> newEmbeddedResources,
-        IList<string> newAdditionalFiles,
-        XDocumentProvider xDocumentProvider)
-    {
-        var outputTaskItems = new LinkedList<TaskItemChanges>();
-        Parallel.ForEach(fileReferences, (fileReference, state, index) =>
+        var projectInfo = new ProjectInfo(this.AssemblyName, this.RootNamespace, new DirectoryInfo(this.ProjectDirectory), new DirectoryInfo(this.SolutionDirectory), intermediateDirectory, assemblyReferences, compiles, xamlFileProvider, this.Debug);
+        var xamlOptimizers = xamlOptimizerFactory
+            .CreateXamlOptimizers(assemblyResolver, xamlPlatformInfo, projectInfo, xamlOptimizerPaths, sxoSettings)
+            .ToArray();
+        var stopwatch = new Stopwatch();
+        var optimizationResults = xamlOptimizers.SelectAsync(async xamlOptimizer =>
         {
-            var taskItem = taskItems[index];
-            var xDocument = xDocumentProvider.Get(fileReference);
-            var lineEnding = LineEndingDetector.GetLineEnding(xDocument);
-
-            var stopwatch = new Stopwatch();
-            var optimization = OptimizationResult.None();
-            foreach (var xamlOptimizer in xamlOptimizers)
+            try
             {
                 stopwatch.Restart();
-                var result = xamlOptimizer.Optimize(xDocument, fileReference);
-                if (result.IsSuccess)
+                var optimizationResult = await xamlOptimizer.OptimizeAsync(xamlFileProvider.XamlFiles);
+                if (optimizationResult.IsSuccess)
                 {
-                    xDocument = result.XDocument;
-                    foreach (var additionalFile in result.AdditionalFiles)
-                    {
-                        switch (additionalFile.FileAction)
-                        {
-                            case FileAction.Compile:
-                                newCompiles.Add(additionalFile.FileInfo.FullName);
-                                break;
-                            case FileAction.Page:
-                                newPages.Add(additionalFile.FileInfo.FullName);
-                                break;
-                            case FileAction.EmbeddedResource:
-                                newEmbeddedResources.Add(additionalFile.FileInfo.FullName);
-                                break;
-                            case FileAction.AdditionalFile:
-                                newAdditionalFiles.Add(additionalFile.FileInfo.FullName);
-                                break;
-                            case FileAction.AvaloniaXaml:
-                                newAvaloniaXaml.Add(additionalFile.FileInfo.FullName);
-                                break;
-                            case FileAction.MauiXaml:
-                                newMauiXaml.Add(additionalFile.FileInfo.FullName);
-                                break;
-                        }
-                    }
-
-                    optimization = result;
-                    this.Log.LogMessage(MessageImportance.Normal, LogMessages.ItemOptimized, taskItem.ItemSpec, xamlOptimizer.GetType().Name, stopwatch.Elapsed);
+                    this.Log.LogMessage(MessageImportance.Normal, LogMessages.ItemsOptimized, xamlOptimizer.GetType().Name, stopwatch.Elapsed);
+                    await AddAdditionalFiles(optimizationResult.AdditionalFiles, newItems).ConfigureAwait(false);
                 }
                 else
                 {
-                    this.Log.LogMessage(MessageImportance.Normal, LogMessages.NothingToOptimize, taskItem.ItemSpec, xamlOptimizer.GetType().Name, stopwatch.Elapsed);
+                    this.Log.LogMessage(MessageImportance.Normal, LogMessages.NothingToOptimize, xamlOptimizer.GetType().Name, stopwatch.Elapsed);
                 }
 
-                foreach (var xamlDiagnostic in result.XamlDiagnostics)
-                {
-                    switch (xamlDiagnostic.DiagnosticSeverity)
-                    {
-                        case DiagnosticSeverity.Info:
-                            this.Log.LogMessage(
-                                MessageImportance.Normal,
-                                xamlDiagnostic.ToMessage());
-                            break;
-                        case DiagnosticSeverity.Warning:
-                            this.Log.LogWarning(
-                                xamlOptimizer.GetType().Name,
-                                xamlDiagnostic.Code,
-                                string.Empty,
-                                xamlDiagnostic.FilePath,
-                                xamlDiagnostic.LineNumber,
-                                xamlDiagnostic.ColumnNumber,
-                                xamlDiagnostic.EndLineNumber,
-                                xamlDiagnostic.EndColumnNumber,
-                                xamlDiagnostic.Message,
-                                xamlDiagnostic.MessageArguments);
-                            break;
-                        case DiagnosticSeverity.Error:
-                            this.Log.LogError(
-                                xamlOptimizer.GetType().Name,
-                                xamlDiagnostic.Code,
-                                string.Empty,
-                                xamlDiagnostic.FilePath,
-                                xamlDiagnostic.LineNumber,
-                                xamlDiagnostic.ColumnNumber,
-                                xamlDiagnostic.EndLineNumber,
-                                xamlDiagnostic.EndColumnNumber,
-                                xamlDiagnostic.Message,
-                                xamlDiagnostic.MessageArguments);
-                            break;
-                    }
-                }
+                this.ReportDiagnostics(optimizationResult.XamlDiagnostics, xamlOptimizer);
+                return optimizationResult;
             }
-
-            if (optimization.IsSuccess)
+            catch (Exception e)
             {
-                var optimizedXamlFilePath = XamlWriter.Save(
-                    xDocument,
-                    sxoDirectory.FullName,
-                    GetLink(taskItem),
-                    lineEnding);
-                var optimizedTaskItem = new TaskItem(optimizedXamlFilePath);
-                taskItem.CopyMetadataTo(optimizedTaskItem);
-                optimizedTaskItem.SetMetadata(MetadataNames.Link, GetLink(taskItem));
-                outputTaskItems.AddLast(new TaskItemChanges(optimizedTaskItem, taskItem));
+                this.Log.LogErrorFromException(e);
+                throw;
             }
-        });
+        }).Result;
 
-        return outputTaskItems;
+        var applicationXamlTaskItems =
+            new ApplicationXamlItems<List<TaskItemChanges>>(
+                () => new List<TaskItemChanges>());
+
+        var xamlFileChanges = new HashSet<XamlFileChange>(new XamlFileChangeIdentityEqualityComparer());
+        optimizationResults.Reverse();
+        foreach (var xamlFileChange in optimizationResults.SelectMany(x => x.XamlFileChanges))
+        {
+            xamlFileChanges.Add(xamlFileChange);
+        }
+
+        foreach (var xamlFileChange in xamlFileChanges)
+        {
+            switch (xamlFileChange.Action)
+            {
+                case XamlFileAction.None:
+                    break;
+                case XamlFileAction.Remove:
+                    if (xamlFileChange.File.Reference is TaskItemFileReference taskItemFileReferenceToRemove)
+                    {
+                        var taskItems = GetTaskItems(xamlFileChange, applicationXamlTaskItems);
+                        if (taskItems.HasValue())
+                        {
+                            taskItems.Add(new TaskItemChanges(null, taskItemFileReferenceToRemove.TaskItem));
+                        }
+                    }
+
+                    break;
+                case XamlFileAction.Update:
+                    var evaluatedPath = GetLinkPath(xamlFileChange.File.Reference);
+                    var optimizedXamlFilePath = XamlWriter.Save(
+                        xamlFileChange.File.Document,
+                        intermediateDirectory.FullName,
+                        evaluatedPath,
+                        xamlFileChange.File.LineEndings);
+                    if (xamlFileChange.File.Reference is TaskItemFileReference taskItemFileReference)
+                    {
+                        var oldTaskItem = taskItemFileReference.TaskItem;
+                        var optimizedTaskItem = new TaskItem(optimizedXamlFilePath);
+                        oldTaskItem.CopyMetadataTo(optimizedTaskItem);
+                        optimizedTaskItem.SetMetadata(MetadataNames.Link, evaluatedPath);
+                        var taskItems = GetTaskItems(xamlFileChange, applicationXamlTaskItems);
+                        if (taskItems.HasValue())
+                        {
+                            taskItems.Add(new TaskItemChanges(optimizedTaskItem, oldTaskItem));
+                        }
+                    }
+
+                    break;
+            }
+        }
+
+        this.ObsoletePages = applicationXamlTaskItems.PageItems.ToArray(changes => changes.RemoveTaskItem);
+        this.OptimizedPages = applicationXamlTaskItems.PageItems.Select(x => x.IncludeTaskItem).WhereNotNull().ToArray();
+        this.ObsoleteAvaloniaXaml = applicationXamlTaskItems.AvaloniaXamlItems.ToArray(changes => changes.RemoveTaskItem);
+        this.OptimizedAvaloniaXaml = applicationXamlTaskItems.AvaloniaXamlItems.Select(x => x.IncludeTaskItem).WhereNotNull().ToArray();
+        this.ObsoleteMauiXaml = applicationXamlTaskItems.MauiXamlItems.ToArray(changes => changes.RemoveTaskItem);
+        this.OptimizedMauiXaml = applicationXamlTaskItems.MauiXamlItems.Select(x => x.IncludeTaskItem).WhereNotNull().ToArray();
+        this.ObsoleteEmbeddedXamlResources = applicationXamlTaskItems.EmbeddedResourceItems.ToArray(changes => changes.RemoveTaskItem);
+        this.OptimizedEmbeddedXamlResources = applicationXamlTaskItems.EmbeddedResourceItems.Select(x => x.IncludeTaskItem).WhereNotNull().ToArray();
+        this.ObsoleteApplicationDefinitions = applicationXamlTaskItems.ApplicationDefinition.ToArray(changes => changes.RemoveTaskItem);
+        this.OptimizedApplicationDefinitions = applicationXamlTaskItems.ApplicationDefinition.Select(x => x.IncludeTaskItem).WhereNotNull().ToArray();
+        this.NewCompiles = newItems.CompileItems.ToArray();
+        this.NewPages = newItems.PageItems.ToArray();
+        this.NewAvaloniaXaml = newItems.AvaloniaXamlItems.ToArray();
+        this.NewMauiXaml = newItems.MauiXamlItems.ToArray();
+        this.NewEmbeddedResources = newItems.EmbeddedResourceItems.ToArray();
+        this.NewAdditionalFiles = newItems.AdditionalFileItems.ToArray();
+    }
+
+    private void ReportDiagnostics(IReadOnlyCollection<XamlDiagnostic> xamlDiagnostics, IXamlOptimizer xamlOptimizer)
+    {
+        foreach (var xamlDiagnostic in xamlDiagnostics)
+        {
+            var diagnosticSeverity = xamlDiagnostic.DiagnosticSeverity;
+            diagnosticSeverity = diagnosticSeverity == DiagnosticSeverity.Warning && this.TreatWarningsAsErrors ? DiagnosticSeverity.Error : diagnosticSeverity;
+            switch (diagnosticSeverity)
+            {
+                case DiagnosticSeverity.Info:
+                    this.Log.LogMessage(
+                        MessageImportance.Normal,
+                        xamlDiagnostic.ToMessage());
+                    break;
+                case DiagnosticSeverity.Warning:
+                    this.Log.LogWarning(
+                        xamlOptimizer.GetType().Name,
+                        xamlDiagnostic.Code,
+                        string.Empty,
+                        xamlDiagnostic.FilePath,
+                        xamlDiagnostic.LineNumber,
+                        xamlDiagnostic.ColumnNumber,
+                        xamlDiagnostic.EndLineNumber,
+                        xamlDiagnostic.EndColumnNumber,
+                        xamlDiagnostic.Message,
+                        xamlDiagnostic.MessageArguments);
+                    break;
+                case DiagnosticSeverity.Error:
+                    this.Log.LogError(
+                        xamlOptimizer.GetType().Name,
+                        xamlDiagnostic.Code,
+                        string.Empty,
+                        xamlDiagnostic.FilePath,
+                        xamlDiagnostic.LineNumber,
+                        xamlDiagnostic.ColumnNumber,
+                        xamlDiagnostic.EndLineNumber,
+                        xamlDiagnostic.EndColumnNumber,
+                        xamlDiagnostic.Message,
+                        xamlDiagnostic.MessageArguments);
+                    break;
+            }
+        }
     }
 }
