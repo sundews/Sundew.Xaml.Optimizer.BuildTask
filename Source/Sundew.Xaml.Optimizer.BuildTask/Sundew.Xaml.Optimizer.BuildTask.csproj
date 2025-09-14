@@ -1,5 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	<Import Project="$(NuGetPackageRoot)\ilrepack.lib.msbuild.task\2.0.43\build\ILRepack.Lib.MSBuild.Task.targets" />
+	
+	<Import Project="$(NuGetPackageRoot)\ilrepack.lib.msbuild.task\2.0.43\build\ILRepack.Lib.MSBuild.Task.targets" Condition="Exists('$(NuGetPackageRoot)\ilrepack.lib.msbuild.task\2.0.43\build\ILRepack.Lib.MSBuild.Task.targets')"/>
+	<Import Project="C:\Users\runneradmin\.nuget\packages\\ilrepack.lib.msbuild.task\2.0.43\build\ILRepack.Lib.MSBuild.Task.targets" Condition="Exists('C:\Users\runneradmin\.nuget\packages\\ilrepack.lib.msbuild.task\2.0.43\build\ILRepack.Lib.MSBuild.Task.targets')"/>
 	<PropertyGroup>
     <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
