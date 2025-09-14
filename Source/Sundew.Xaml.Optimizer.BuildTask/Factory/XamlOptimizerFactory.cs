@@ -33,18 +33,17 @@ public class XamlOptimizerFactory
     /// <summary>Prepares the optimizers.</summary>
     /// <param name="assemblyResolver">The assembly resolver.</param>
     /// <param name="xamlPlatformInfo">The framework xml definitions.</param>
-    /// <param name="projectInfo">The project info.</param>
     /// <param name="optimizationAssemblies">The optimization assemblies.</param>
     /// <param name="sxoSettings">The sxo settings.</param>
     /// <returns>The optimization runners.</returns>
     public IEnumerable<IXamlOptimizer> CreateXamlOptimizers(
         AssemblyResolver assemblyResolver,
         XamlPlatformInfo xamlPlatformInfo,
-        ProjectInfo projectInfo,
-        IReadOnlyList<string> optimizationAssemblies,
+        IReadOnlyList<(string Path, AssemblyName AssemblyName)> optimizationAssemblies,
         IReadOnlyCollection<SxoSettings> sxoSettings)
     {
-        var exportedTypes = optimizationAssemblies.Select(assemblyResolver.Load).SelectMany(x => x.ExportedTypes);
+        var assemblies = optimizationAssemblies.Select(x => assemblyResolver.Load(x.AssemblyName, x.Path)).ToArray();
+        var exportedTypes = assemblies.SelectMany(x => x.ExportedTypes).ToArray();
         var xamlOptimizerTypes = exportedTypes.Where(type => typeof(IXamlOptimizer).IsAssignableFrom(type))
             .ToList();
         foreach (var sxoSetting in sxoSettings)
@@ -56,7 +55,7 @@ public class XamlOptimizerFactory
                              .Select(x =>
                              {
                                  var xamlOptimizer =
-                                     CreateXamlOptimizer(x, xamlPlatformInfo, projectInfo, enabledOptimizer.Settings);
+                                     CreateXamlOptimizer(x, enabledOptimizer.Settings);
                                  return xamlOptimizer.SupportedPlatforms.Contains(xamlPlatformInfo.XamlPlatform)
                                      ? xamlOptimizer
                                      : null;
@@ -72,7 +71,7 @@ public class XamlOptimizerFactory
         }
     }
 
-    private static IXamlOptimizer CreateXamlOptimizer(Type type, XamlPlatformInfo xamlPlatformInfo, ProjectInfo projectInfo, JObject settings)
+    private static IXamlOptimizer CreateXamlOptimizer(Type type, JObject settings)
     {
         var constructorInfos = type.GetConstructors(BindingFlags.Instance | BindingFlags.Public)
             .OrderByDescending(x => x.GetParameters().Length);
@@ -82,17 +81,8 @@ public class XamlOptimizerFactory
             object[] arguments = new object[parameterInfos.Length];
             switch (parameterInfos.Length)
             {
-                case 3:
-                    FillArgument(arguments, parameterInfos, xamlPlatformInfo, projectInfo, settings, 0);
-                    FillArgument(arguments, parameterInfos, xamlPlatformInfo, projectInfo, settings, 1);
-                    FillArgument(arguments, parameterInfos, xamlPlatformInfo, projectInfo, settings, 2);
-                    return (IXamlOptimizer)constructorInfo.Invoke(arguments);
-                case 2:
-                    FillArgument(arguments, parameterInfos, xamlPlatformInfo, projectInfo, settings, 0);
-                    FillArgument(arguments, parameterInfos, xamlPlatformInfo, projectInfo, settings, 1);
-                    return (IXamlOptimizer)constructorInfo.Invoke(arguments);
                 case 1:
-                    FillArgument(arguments, parameterInfos, xamlPlatformInfo, projectInfo, settings, 0);
+                    FillArgument(arguments, parameterInfos, settings, 0);
                     return (IXamlOptimizer)constructorInfo.Invoke(arguments);
                 case 0:
                     return (IXamlOptimizer)constructorInfo.Invoke(arguments);
@@ -104,18 +94,10 @@ public class XamlOptimizerFactory
         throw new NotSupportedException($"Could not create the type: {type}");
     }
 
-    private static void FillArgument(object[] arguments, ParameterInfo[] parameterInfos, XamlPlatformInfo xamlPlatformInfo, ProjectInfo projectInfo, JObject settings, int index)
+    private static void FillArgument(object[] arguments, ParameterInfo[] parameterInfos, JObject settings, int index)
     {
         var parameterInfo = parameterInfos[index];
-        if (parameterInfo.ParameterType == typeof(XamlPlatformInfo))
-        {
-            arguments[index] = xamlPlatformInfo;
-        }
-        else if (parameterInfo.ParameterType == typeof(ProjectInfo))
-        {
-            arguments[index] = projectInfo;
-        }
-        else if (parameterInfo.ParameterType == typeof(JObject))
+        if (parameterInfo.ParameterType == typeof(JObject))
         {
             arguments[index] = settings;
         }

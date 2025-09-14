@@ -12,9 +12,9 @@ using Sundew.Xaml.Optimization;
 
 internal sealed class XamlFileChangeIdentityEqualityComparer : IEqualityComparer<XamlFileChange>
 {
-    public bool Equals(XamlFileChange x, XamlFileChange y)
+    public bool Equals(XamlFileChange? x, XamlFileChange? y)
     {
-        return x.File.Reference.Path == y.File.Reference.Path;
+        return x?.File.Reference.Path == y?.File.Reference.Path;
     }
 
     public int GetHashCode(XamlFileChange xamlFilesChange)

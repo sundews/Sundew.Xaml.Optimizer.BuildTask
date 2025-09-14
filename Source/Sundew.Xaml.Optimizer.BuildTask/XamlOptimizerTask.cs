@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Sundew.Base;
@@ -310,9 +311,9 @@ public sealed class XamlOptimizerTask : Task
                     (x, index) => new AssemblyReference(x));
             var intermediateDirectory = new DirectoryInfo(this.IntermediateOutputPath);
             var sxoSettings = new SettingsProvider(logger).GetSettings(this.ProjectDirectory);
-            var optimizerPaths = this.Optimizers.Select(x => x.ItemSpec).ToArray();
-
-            using (var assemblyResolver = new AssemblyResolver(optimizerPaths, AssemblyLoadContext.Default, new OverriddenAssemblyProvider()))
+            var xamlOptimizerPaths = this.Optimizers.Select(x => (x.ItemSpec, System.Reflection.AssemblyName.GetAssemblyName(x.ItemSpec))).ToArray();
+            var searchPaths = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)?.ToEnumerable().WhereNotNull().ToArray() ?? [];
+            using (var assemblyResolver = new AssemblyResolver(searchPaths, xamlOptimizerPaths, new OverriddenAssemblyProvider()))
             {
                 this.Optimize(
                     xamlPlatformInfo,
@@ -321,7 +322,7 @@ public sealed class XamlOptimizerTask : Task
                     assemblyReferences,
                     intermediateDirectory,
                     sxoSettings,
-                    optimizerPaths,
+                    xamlOptimizerPaths,
                     assemblyResolver);
             }
         }
@@ -414,7 +415,7 @@ public sealed class XamlOptimizerTask : Task
         TaskItemLazyList<AssemblyReference> assemblyReferences,
         DirectoryInfo intermediateDirectory,
         IReadOnlyCollection<SxoSettings> sxoSettings,
-        IReadOnlyList<string> xamlOptimizerPaths,
+        IReadOnlyList<(string Path, AssemblyName AssemblyName)> xamlOptimizerAssemblies,
         AssemblyResolver assemblyResolver)
     {
         var pages = this.Pages.Select((x, i) => new TaskItemFileReference(x, BuildAction.Page));
@@ -450,7 +451,7 @@ public sealed class XamlOptimizerTask : Task
 
         var projectInfo = new ProjectInfo(this.AssemblyName, this.RootNamespace, new DirectoryInfo(this.ProjectDirectory), new DirectoryInfo(this.SolutionDirectory), intermediateDirectory, assemblyReferences, compiles, xamlFileProvider, this.Debug);
         var xamlOptimizers = xamlOptimizerFactory
-            .CreateXamlOptimizers(assemblyResolver, xamlPlatformInfo, projectInfo, xamlOptimizerPaths, sxoSettings)
+            .CreateXamlOptimizers(assemblyResolver, xamlPlatformInfo, xamlOptimizerAssemblies, sxoSettings)
             .ToArray();
         var stopwatch = new Stopwatch();
         var optimizationResults = xamlOptimizers.SelectAsync(async xamlOptimizer =>
@@ -458,7 +459,7 @@ public sealed class XamlOptimizerTask : Task
             try
             {
                 stopwatch.Restart();
-                var optimizationResult = await xamlOptimizer.OptimizeAsync(xamlFileProvider.XamlFiles);
+                var optimizationResult = await xamlOptimizer.OptimizeAsync(xamlFileProvider.XamlFiles, xamlPlatformInfo, projectInfo);
                 if (optimizationResult.IsSuccess)
                 {
                     this.Log.LogMessage(MessageImportance.Normal, LogMessages.ItemsOptimized, xamlOptimizer.GetType().Name, stopwatch.Elapsed);

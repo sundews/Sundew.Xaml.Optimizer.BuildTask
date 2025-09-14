@@ -12,6 +12,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Sundew.Base;
+using Sundew.Base.Collections.Linq;
 
 /// <summary>Helps load and resolve assemblies.</summary>
 /// <seealso cref="System.IDisposable" />
@@ -19,60 +21,39 @@ public class AssemblyResolver : IDisposable
 {
     private const string DllExtension = ".dll";
     private const string ExeExtension = ".exe";
-    private readonly Dictionary<string, Assembly> overridenAssemblies = new Dictionary<string, Assembly>();
+    private readonly Dictionary<string, Assembly> overridenAssemblies = new();
 
     private readonly IReadOnlyList<string> searchPaths;
-    private readonly Func<AssemblyName, Assembly> assemblyLoad;
+    private readonly Dictionary<string, string?> assemblySearchPaths;
 
     /// <summary>Initializes a new instance of the <see cref="AssemblyResolver"/> class.</summary>
     /// <param name="searchPaths">The search paths.</param>
-    /// <param name="assemblyLoadContext">The assembly load context.</param>
+    /// <param name="xamlOptimizerAssemblies">The xaml optimizer assemblies.</param>
     /// <param name="overriddenAssemblyProvider">The overridden assembly provider.</param>
-    public AssemblyResolver(IReadOnlyList<string> searchPaths, AssemblyLoadContext assemblyLoadContext, IOverriddenAssemblyProvider overriddenAssemblyProvider)
+    public AssemblyResolver(IReadOnlyList<string> searchPaths, IReadOnlyList<(string Path, AssemblyName AssemblyName)> xamlOptimizerAssemblies, IOverriddenAssemblyProvider overriddenAssemblyProvider)
     {
-        this.assemblyLoad = assemblyLoadContext switch
-        {
-            AssemblyLoadContext.Default => Assembly.Load,
-            AssemblyLoadContext.From => (AssemblyName assemblyName) => Assembly.LoadFrom(assemblyName.CodeBase),
-            AssemblyLoadContext.File => (AssemblyName assemblyName) => Assembly.LoadFile(assemblyName.CodeBase),
-            _ => throw new NotSupportedException("Invalid load context"),
-        };
+        this.searchPaths = searchPaths;
+        this.assemblySearchPaths = xamlOptimizerAssemblies.ToDictionary(x => x.AssemblyName.FullName, x => Path.GetDirectoryName(x.Path) ?? null);
 
         foreach (var overridenAssembly in overriddenAssemblyProvider.GetOverriddenAssemblies())
         {
-            this.overridenAssemblies.Add(overridenAssembly.FullName, overridenAssembly);
+            if (overridenAssembly.FullName.HasValue())
+            {
+                this.overridenAssemblies.Add(overridenAssembly.FullName, overridenAssembly);
+            }
         }
 
         AppDomain.CurrentDomain.TypeResolve += this.OnCurrentDomainTypeResolve;
         AppDomain.CurrentDomain.AssemblyResolve += this.OnCurrentDomainAssemblyResolve;
-        this.searchPaths = searchPaths.Select(x =>
-        {
-            if (Path.HasExtension(x))
-            {
-                return Path.GetDirectoryName(x);
-            }
-
-            return x;
-        }).ToList();
     }
 
     /// <summary>Loads the specified path.</summary>
+    /// <param name="assemblyName">The assembly name.</param>
     /// <param name="path">The path.</param>
     /// <returns>The loaded assembly.</returns>
-    public Assembly Load(string path)
+    public Assembly Load(AssemblyName assemblyName, string path)
     {
-        var extension = Path.GetExtension(path);
-        if (extension != DllExtension && extension != ExeExtension)
-        {
-            path += DllExtension;
-        }
-
-        if (!Path.IsPathRooted(path))
-        {
-            path = this.GetPath(path);
-        }
-
-        return this.assemblyLoad(AssemblyName.GetAssemblyName(path));
+        return this.Load(assemblyName, path, false);
     }
 
     /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
@@ -82,56 +63,87 @@ public class AssemblyResolver : IDisposable
         AppDomain.CurrentDomain.TypeResolve -= this.OnCurrentDomainTypeResolve;
     }
 
-    private Assembly OnCurrentDomainTypeResolve(object sender, ResolveEventArgs args)
+    private Assembly OnCurrentDomainTypeResolve(object? sender, ResolveEventArgs args)
     {
         throw new NotSupportedException("Could not find type: " + args.Name);
     }
 
-    private Assembly? OnCurrentDomainAssemblyResolve(object sender, ResolveEventArgs args)
+    private Assembly? OnCurrentDomainAssemblyResolve(object? sender, ResolveEventArgs args)
     {
+        var assemblyName = new AssemblyName(args.Name);
+        if (assemblyName.Name.HasValue() &&
+            (assemblyName.Name.StartsWith("System.") ||
+            assemblyName.Name.StartsWith("Microsoft.") ||
+            assemblyName.Name.StartsWith("mscorlib")))
+        {
+            return null;
+        }
+
+#if NET8_0_OR_GREATER
+        var referencedAssembly = System.Runtime.Loader.AssemblyLoadContext.All.SelectMany(x => x.Assemblies).FirstOrDefault(x => x.FullName == assemblyName.FullName);
+        if (referencedAssembly.HasValue())
+        {
+            return referencedAssembly;
+        }
+#endif
         if (this.overridenAssemblies.TryGetValue(args.Name, out var assembly))
         {
             return assembly;
         }
 
-        var assemblyName = new AssemblyName(args.Name);
         IEnumerable<string> searchFolders = this.searchPaths;
+        if (this.assemblySearchPaths.TryGetValue(assemblyName.FullName, out var path) && path != null)
+        {
+            searchFolders = searchFolders.Concat([path]);
+        }
+
         if (args.RequestingAssembly != null)
         {
-            var requestingAssemblyFolder = new[] { args.RequestingAssembly.Location };
-            requestingAssemblyFolder.Concat(this.searchPaths);
+            var requestingAssemblyFolder = Path.GetDirectoryName(args.RequestingAssembly.Location)?.ToEnumerable().WhereNotNull() ?? [];
+            searchFolders = searchFolders.Concat(requestingAssemblyFolder).ToArray();
         }
 
         var paths = this.GetPaths(searchFolders, assemblyName.Name + DllExtension).ToList();
-        var exactVersion = paths.FirstOrDefault(x => x.Name.Version == assemblyName.Version);
+        var exactVersion = paths.FirstOrDefault(x => x.Version == assemblyName.Version);
         if (exactVersion != default)
         {
-            return this.assemblyLoad(exactVersion.Name);
+            return this.Load(exactVersion.AssemblyName, exactVersion.Path, true);
         }
 
-        var latestMajorMatch = paths.FirstOrDefault(x => x.Name.Version.Major == assemblyName.Version.Major);
+        var latestMajorMatch = paths.FirstOrDefault(x => x.Version.Major == assemblyName.Version?.Major);
         if (latestMajorMatch != default)
         {
-            return this.assemblyLoad(latestMajorMatch.Name);
+            return this.Load(latestMajorMatch.AssemblyName, latestMajorMatch.Path, true);
         }
 
-        //// throw new NotSupportedException("Could not find assembly: " + args.Name);
         return null;
     }
 
-    private string GetPath(string assemblyFileName)
-    {
-        return this.searchPaths
-            .Select(x => Path.Combine(x, assemblyFileName))
-            .FirstOrDefault(File.Exists);
-    }
-
-    private IEnumerable<(AssemblyName Name, string Path)> GetPaths(IEnumerable<string> searchPaths, string assemblyFileName)
+    private IEnumerable<(string Name, Version Version, string Path, AssemblyName AssemblyName)> GetPaths(IEnumerable<string> searchPaths, string assemblyFileName)
     {
         return searchPaths
             .Select(x => Path.Combine(x, assemblyFileName))
             .Where(File.Exists)
-            .Select(x => (Name: AssemblyName.GetAssemblyName(x), Path: x))
-            .OrderByDescending(x => x.Name.Version);
+            .Select(x => (AssemblyName: AssemblyName.GetAssemblyName(x), Path: x))
+            .Where(x => !string.IsNullOrEmpty(x.AssemblyName.Name) && x.AssemblyName.Version.HasValue())
+            .Select(x => (Name: x.AssemblyName.Name!, Version: x.AssemblyName.Version!, x.Path, AssemblyName: x.AssemblyName))
+            .OrderByDescending(x => x.Version);
+    }
+
+    private Assembly Load(AssemblyName assemblyName, string assemblyPath, bool usePath)
+    {
+#if NET8_0_OR_GREATER
+        var xamlOptimizerAssemblyLoadContext =
+            System.Runtime.Loader.AssemblyLoadContext.All.FirstOrDefault(x =>
+                x.Assemblies.Contains(Assembly.GetExecutingAssembly())) ?? System.Runtime.Loader.AssemblyLoadContext.Default;
+        if (usePath)
+        {
+            return xamlOptimizerAssemblyLoadContext.LoadFromAssemblyPath(assemblyPath);
+        }
+
+        return xamlOptimizerAssemblyLoadContext.LoadFromAssemblyName(assemblyName);
+#else
+        return Assembly.Load(assemblyName);
+#endif
     }
 }

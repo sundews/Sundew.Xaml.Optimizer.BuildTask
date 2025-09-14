@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+	<Import Project="$(NuGetPackageRoot)\ilrepack.lib.msbuild.task\2.0.43\build\ILRepack.Lib.MSBuild.Task.targets" />
+	<PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <NuspecFile>Sundew.Xaml.Optimizer.BuildTask.nuspec</NuspecFile>
     <OutputPath>bin\$(Configuration)</OutputPath>
@@ -21,9 +22,10 @@ https://github.com/sundews/Sundew.Xaml.Optimization</Description>
     <DocumentationFile>$(OutputPath)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
      <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
+		<PackageFilesOutputPath>$(BaseIntermediateOutputPath)\$(Configuration)\package</PackageFilesOutputPath>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <Optimize>true</Optimize>
   </PropertyGroup>
 
@@ -55,7 +57,7 @@ https://github.com/sundews/Sundew.Xaml.Optimization</Description>
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Sundew.Xaml.Optimization" Version="3.0.0-u20250907-220120-ci" />
+    <PackageReference Include="Sundew.Xaml.Optimization" Version="3.0.0-u20250914-133414-ci" />
   </ItemGroup>
 
   <ItemGroup>
@@ -68,8 +70,13 @@ https://github.com/sundews/Sundew.Xaml.Optimization</Description>
     </PropertyGroup>
   </Target>
 
-  <Target Name="ILRepacker" BeforeTargets="PostBuildEvent" AfterTargets="Build" Condition="$(Configuration.Contains('Release'))">
-    <ItemGroup>
+	<Target Name="CleanPackageDir" BeforeTargets="DispatchToInnerBuilds">
+		<RemoveDir Directories="$(PackageFilesOutputPath)" />
+
+	</Target>
+
+	<Target Name="ILRepacker" BeforeTargets="PostBuildEvent" AfterTargets="Build" Condition="$(Configuration.Contains('Release')) AND $(TargetFramework) != ''">
+      <ItemGroup>
       <InputAssemblies Include="$(OutputPath)**\*.dll" />
       <OutputAssemblies Include="$(OutputPath)$(AssemblyName).m.dll" />
       <OutputAssemblies Include="$(OutputPath)**\Microsoft.Build*.dll" />
@@ -77,9 +84,12 @@ https://github.com/sundews/Sundew.Xaml.Optimization</Description>
       <OutputAssemblies Include="$(OutputPath)Sundew.Xaml.Optimization.dll" />
       <InputAssemblies Remove="@(OutputAssemblies)" />
       <InputAssemblies Remove="$(OutputPath)$(AssemblyName).dll" />
-    </ItemGroup>
+		</ItemGroup>
 
     <ILRepack DebugInfo="true" Parallel="true" Internalize="true" InputAssemblies="$(OutputPath)\$(AssemblyName).dll;@(InputAssemblies)" InternalizeExclude="$(AssemblyName)" TargetKind="Dll" LibraryPath="$(OutputPath)" OutputFile="$(OutputPath)\$(AssemblyName).m.dll" />
+
+    <Copy SourceFiles="@(OutputAssemblies)" DestinationFiles="@(OutputAssemblies->'$(PackageFilesOutputPath)\tools\$(TargetFramework)\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
+
   </Target>
 
   <Target Name="NoILRepacker" BeforeTargets="PostBuildEvent" AfterTargets="Build" Condition="!$(Configuration.Contains('Release'))">
@@ -87,18 +97,19 @@ https://github.com/sundews/Sundew.Xaml.Optimization</Description>
       <OutputAssemblies Include="$(OutputPath)**\*.dll" />
       <OutputAssemblies Remove="$(OutputPath)$(AssemblyName).m.dll" />
     </ItemGroup>
+
+    <Copy SourceFiles="@(OutputAssemblies)" DestinationFiles="@(OutputAssemblies->'$(PackageFilesOutputPath)\tools\$(TargetFramework)\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
   </Target>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <ItemGroup>
-      <OutputFiles Include="@(OutputAssemblies)" />
+
+		<ItemGroup>
       <BuildFiles Include="$(MSBuildProjectDirectory)\build\**\*.*" />
       <ContentFiles Include="$(MSBuildProjectDirectory)\content\**\*.*" />
     </ItemGroup>
-    <RemoveDir Directories="$(IntermediateOutputPath)\package" />
-    <Copy SourceFiles="@(OutputFiles)" DestinationFiles="@(OutputFiles->'$(IntermediateOutputPath)\package\tools\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
-    <Copy SourceFiles="@(BuildFiles)" DestinationFiles="@(BuildFiles->'$(IntermediateOutputPath)\package\build\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
-    <Copy SourceFiles="@(ContentFiles)" DestinationFiles="@(ContentFiles->'$(IntermediateOutputPath)\package\content\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
+
+    <Copy SourceFiles="@(BuildFiles)" DestinationFiles="@(BuildFiles->'$(PackageFilesOutputPath)\build\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
+    <Copy SourceFiles="@(ContentFiles)" DestinationFiles="@(ContentFiles->'$(PackageFilesOutputPath)\content\%(RecursiveDir)%(Filename)%(Extension)')" ContinueOnError="False" />
   </Target>
   
 </Project>

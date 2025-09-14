@@ -12,6 +12,7 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Xml;
 using System.Xml.Linq;
+using Sundew.Base;
 
 /// <summary>
 /// Optimizer for xaml files, which optimizes the use of merge resource dictionaries.
@@ -31,7 +32,12 @@ public static class XamlWriter
     public static string Save(XDocument xDocument, string sxoDirectory, string inputIdentity, string lineEnding)
     {
         var outputPath = Path.Combine(sxoDirectory, inputIdentity);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+        var directory = Path.GetDirectoryName(outputPath);
+        if (directory.HasValue())
+        {
+            Directory.CreateDirectory(directory);
+        }
+
         var xmlWriterSettings = new XmlWriterSettings
         {
             OmitXmlDeclaration = xDocument.Declaration == null,
@@ -84,7 +90,7 @@ public static class XamlWriter
             }
         }
 
-        public override void WriteStartElement(string prefix, string localName, string ns)
+        public override void WriteStartElement(string? prefix, string localName, string? ns)
         {
             base.WriteStartElement(prefix, localName, ns);
             if (this.elementCount < 1)

@@ -1,16 +1,18 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <_SundewXamlOptimizerMerged>$(MSBuildThisFileDirectory)..\tools\Sundew.Xaml.Optimizer.BuildTask.m.dll</_SundewXamlOptimizerMerged>
-    <_SundewXamlOptimizer Condition="Exists($(_SundewXamlOptimizerMerged))">$(_SundewXamlOptimizerMerged)</_SundewXamlOptimizer>
-    <_SundewXamlOptimizer Condition="'$(_SundewXamlOptimizer)'==''">$(MSBuildThisFileDirectory)..\tools\Sundew.Xaml.Optimizer.BuildTask.dll</_SundewXamlOptimizer>
+	  <_TargetFramework Condition="'$(MSBuildRuntimeType)' == 'Full'">netstandard2.0</_TargetFramework>
+	  <_TargetFramework Condition="'$(MSBuildRuntimeType)' == 'Core'">net8.0</_TargetFramework>
+	  <_SundewXamlOptimizerMerged >$(MSBuildThisFileDirectory)..\tools\$(_TargetFramework)\Sundew.Xaml.Optimizer.BuildTask.m.dll</_SundewXamlOptimizerMerged>
+	  <_SundewXamlOptimizer Condition="Exists($(_SundewXamlOptimizerMerged))">$(_SundewXamlOptimizerMerged)</_SundewXamlOptimizer>
+	  <_SundewXamlOptimizer Condition="'$(_SundewXamlOptimizer)'==''">$(MSBuildThisFileDirectory)..\tools\$(_TargetFramework)\Sundew.Xaml.Optimizer.BuildTask.dll</_SundewXamlOptimizer>
   </PropertyGroup>
   <UsingTask
     TaskName="XamlOptimizerTask"
     AssemblyFile="$(_SundewXamlOptimizer)"
     TaskFactory="TaskHostFactory"/>
 
-  <Target Name="OptimizeXamlResources" BeforeTargets="XamlMarkupCompilePass1;MarkupCompilePass1;_FindXamlGFiles"
+  <Target Name="OptimizeXamlResources" BeforeTargets="XamlMarkupCompilePass1;MarkupCompilePass1;_FindXamlGFiles;PrepareToCompileAvaloniaXaml"
           Condition="!$(DefineConstants.Contains('DISABLE_SXO')) AND $(DesignTimeBuild) != true AND $(BuildingProject) == true">
     <CreateItem Include="@(EmbeddedResource)" Condition="'%(Extension)' == '.xaml'">
       <Output TaskParameter="Include" ItemName="EmbeddedXamlResource"/>
