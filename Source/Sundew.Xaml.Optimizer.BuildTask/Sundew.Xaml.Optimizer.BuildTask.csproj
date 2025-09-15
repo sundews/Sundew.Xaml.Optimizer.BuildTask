@@ -59,7 +59,7 @@ https://github.com/sundews/Sundew.Xaml.Optimization</Description>
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Sundew.Xaml.Optimization" Version="3.0.0-u20250914-133414-ci" />
+    <PackageReference Include="Sundew.Xaml.Optimization" Version="3.0.0-u20250914-162907-ci" />
   </ItemGroup>
 
   <ItemGroup>
