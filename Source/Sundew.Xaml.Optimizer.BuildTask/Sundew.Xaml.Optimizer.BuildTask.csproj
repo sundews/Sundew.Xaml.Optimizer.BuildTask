@@ -46,8 +46,8 @@ https://github.com/sundews/Sundew.Xaml.Optimization
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Build.Framework" Version="16.5.0" />
-    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="16.5.0" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.8" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.14.8" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="PolySharp" Version="1.15.0">
       <PrivateAssets>all</PrivateAssets>
