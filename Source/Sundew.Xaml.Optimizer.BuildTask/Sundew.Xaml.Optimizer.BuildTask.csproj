@@ -11,12 +11,15 @@
     <IsTool>true</IsTool>
     <IncludeBuildOutput>true</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>
-    <Description>See following link for samples:
+    <Description>A framework for creating Xaml optimizers for WPF, Avalonia, Maui, WinUI, UWP and Xamarin.Forms.
+
+See following link for samples:
 https://github.com/sundews/Sundew.Xaml.Optimizer.Sample
 See following link for current optimizations:
 https://github.com/sundews/Sundew.Xaml.Optimizations
 See following link for implementing custom optimizations:
-https://github.com/sundews/Sundew.Xaml.Optimization</Description>
+https://github.com/sundews/Sundew.Xaml.Optimization
+    </Description>
     <PackageReleaseNotes>3.0.0 - Changed to .NET Standard 2.0, adds support for Sundew.Xaml.Optimization 3.0.0
 2.0.0 - Adds support for Sundew.Xaml.Optimization 2.0.0
 1.0.0 - First release
