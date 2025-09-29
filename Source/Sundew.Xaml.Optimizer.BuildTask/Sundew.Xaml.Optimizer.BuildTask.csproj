@@ -42,7 +42,7 @@ https://github.com/sundews/Sundew.Xaml.Optimization
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.43">
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.44">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
