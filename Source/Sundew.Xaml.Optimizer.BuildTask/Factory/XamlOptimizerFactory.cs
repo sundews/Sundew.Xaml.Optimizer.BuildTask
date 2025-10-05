@@ -104,7 +104,7 @@ public class XamlOptimizerFactory
         else
         {
             var argument = settings.ToObject(parameterInfo.ParameterType);
-            if (argument.HasValue())
+            if (argument.HasValue)
             {
                 arguments[index] = argument;
             }

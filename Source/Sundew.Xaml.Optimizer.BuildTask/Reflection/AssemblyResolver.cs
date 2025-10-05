@@ -37,7 +37,7 @@ public class AssemblyResolver : IDisposable
 
         foreach (var overridenAssembly in overriddenAssemblyProvider.GetOverriddenAssemblies())
         {
-            if (overridenAssembly.FullName.HasValue())
+            if (overridenAssembly.FullName.HasValue)
             {
                 this.overridenAssemblies.Add(overridenAssembly.FullName, overridenAssembly);
             }
@@ -71,7 +71,7 @@ public class AssemblyResolver : IDisposable
     private Assembly? OnCurrentDomainAssemblyResolve(object? sender, ResolveEventArgs args)
     {
         var assemblyName = new AssemblyName(args.Name);
-        if (assemblyName.Name.HasValue() &&
+        if (assemblyName.Name.HasValue &&
             (assemblyName.Name.StartsWith("System.") ||
             assemblyName.Name.StartsWith("Microsoft.") ||
             assemblyName.Name.StartsWith("mscorlib")))
@@ -81,7 +81,7 @@ public class AssemblyResolver : IDisposable
 
 #if NET8_0_OR_GREATER
         var referencedAssembly = System.Runtime.Loader.AssemblyLoadContext.All.SelectMany(x => x.Assemblies).FirstOrDefault(x => x.FullName == assemblyName.FullName);
-        if (referencedAssembly.HasValue())
+        if (referencedAssembly.HasValue)
         {
             return referencedAssembly;
         }
@@ -125,7 +125,7 @@ public class AssemblyResolver : IDisposable
             .Select(x => Path.Combine(x, assemblyFileName))
             .Where(File.Exists)
             .Select(x => (AssemblyName: AssemblyName.GetAssemblyName(x), Path: x))
-            .Where(x => !string.IsNullOrEmpty(x.AssemblyName.Name) && x.AssemblyName.Version.HasValue())
+            .Where(x => !string.IsNullOrEmpty(x.AssemblyName.Name) && x.AssemblyName.Version.HasValue)
             .Select(x => (Name: x.AssemblyName.Name!, Version: x.AssemblyName.Version!, x.Path, AssemblyName: x.AssemblyName))
             .OrderByDescending(x => x.Version);
     }

@@ -351,7 +351,7 @@ public sealed class XamlOptimizerTask : Task
             await FileHelper.WriteAllTextAsync(additionalFile.FileInfo.FullName, additionalFile.Content).ConfigureAwait(false);
 
             var taskItem = new TaskItem(additionalFile.FileInfo.FullName);
-            if (additionalFile.Link.HasValue())
+            if (additionalFile.Link.HasValue)
             {
                 taskItem.SetMetadata(MetadataNames.Link, additionalFile.Link);
             }
@@ -501,7 +501,7 @@ public sealed class XamlOptimizerTask : Task
                     if (xamlFileChange.File.Reference is TaskItemFileReference taskItemFileReferenceToRemove)
                     {
                         var taskItems = GetTaskItems(xamlFileChange, applicationXamlTaskItems);
-                        if (taskItems.HasValue())
+                        if (taskItems.HasValue)
                         {
                             taskItems.Add(new TaskItemChanges(null, taskItemFileReferenceToRemove.TaskItem));
                         }
@@ -522,7 +522,7 @@ public sealed class XamlOptimizerTask : Task
                         oldTaskItem.CopyMetadataTo(optimizedTaskItem);
                         optimizedTaskItem.SetMetadata(MetadataNames.Link, evaluatedPath);
                         var taskItems = GetTaskItems(xamlFileChange, applicationXamlTaskItems);
-                        if (taskItems.HasValue())
+                        if (taskItems.HasValue)
                         {
                             taskItems.Add(new TaskItemChanges(optimizedTaskItem, oldTaskItem));
                         }

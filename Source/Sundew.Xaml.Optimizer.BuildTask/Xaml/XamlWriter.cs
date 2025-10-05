@@ -33,7 +33,7 @@ public static class XamlWriter
     {
         var outputPath = Path.Combine(sxoDirectory, inputIdentity);
         var directory = Path.GetDirectoryName(outputPath);
-        if (directory.HasValue())
+        if (directory.HasValue)
         {
             Directory.CreateDirectory(directory);
         }
