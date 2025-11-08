@@ -10,6 +10,7 @@ namespace Sundew.Xaml.Optimizer.BuildTask;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -163,6 +164,9 @@ public sealed class XamlOptimizerTask : Task
     ///   <c>true</c> if debug; otherwise, <c>false</c>.</value>
     public bool Debug { get; set; }
 
+    /// <summary>Gets or sets the max parallelization.</summary>
+    public string? MaxParallelization { get; set; }
+
     /// <summary>
     /// Gets or sets a value indicating whether warnings are treated as errors.
     /// </summary>
@@ -311,9 +315,12 @@ public sealed class XamlOptimizerTask : Task
                     (x, index) => new AssemblyReference(x));
             var intermediateDirectory = new DirectoryInfo(this.IntermediateOutputPath);
             var sxoSettings = new SettingsProvider(logger).GetSettings(this.ProjectDirectory);
-            var xamlOptimizerPaths = this.Optimizers.Select(x => (x.ItemSpec, System.Reflection.AssemblyName.GetAssemblyName(x.ItemSpec))).ToArray();
-            var searchPaths = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)?.ToEnumerable().WhereNotNull().ToArray() ?? [];
-            using (var assemblyResolver = new AssemblyResolver(searchPaths, xamlOptimizerPaths, new OverriddenAssemblyProvider()))
+            var xamlOptimizerPaths = this.Optimizers
+                .Select(x => (x.ItemSpec, System.Reflection.AssemblyName.GetAssemblyName(x.ItemSpec))).ToArray();
+            var searchPaths = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)?.ToEnumerable()
+                .WhereNotNull().ToArray() ?? [];
+            using (var assemblyResolver =
+                   new AssemblyResolver(searchPaths, xamlOptimizerPaths, new OverriddenAssemblyProvider()))
             {
                 this.Optimize(
                     xamlPlatformInfo,
@@ -326,9 +333,30 @@ public sealed class XamlOptimizerTask : Task
                     assemblyResolver);
             }
         }
+        catch (XamlOptimizerException e)
+        {
+            this.LogXamlOptimizerException(e);
+            return false;
+        }
+        catch (AggregateException aggregateException)
+        {
+            foreach (var innerException in aggregateException.Flatten().InnerExceptions)
+            {
+                if (innerException is XamlOptimizerException xamlOptimizerException)
+                {
+                   this.LogXamlOptimizerException(xamlOptimizerException);
+                }
+                else
+                {
+                    this.Log.LogErrorFromException(innerException, true, true, null);
+                }
+            }
+
+            return false;
+        }
         catch (Exception e)
         {
-            this.Log.LogErrorFromException(e);
+            this.Log.LogErrorFromException(e, true, true, null);
             return false;
         }
 
@@ -447,7 +475,8 @@ public sealed class XamlOptimizerTask : Task
                     applicationXamlItems.AvaloniaXamlItems,
                     applicationXamlItems.MauiXamlItems,
                     applicationXamlItems.EmbeddedResourceItems,
-                    applicationXamlItems.ApplicationDefinition));
+                    applicationXamlItems.ApplicationDefinition),
+            this.MaxParallelization.HasValue && int.TryParse(this.MaxParallelization, out var maxParallelization) ? maxParallelization : Environment.ProcessorCount);
 
         var projectInfo = new ProjectInfo(this.AssemblyName, this.RootNamespace, new DirectoryInfo(this.ProjectDirectory), new DirectoryInfo(this.SolutionDirectory), intermediateDirectory, assemblyReferences, compiles, xamlFileProvider, this.Debug);
         var xamlOptimizers = xamlOptimizerFactory
@@ -459,7 +488,8 @@ public sealed class XamlOptimizerTask : Task
             try
             {
                 stopwatch.Restart();
-                var optimizationResult = await xamlOptimizer.OptimizeAsync(xamlFileProvider.XamlFiles, xamlPlatformInfo, projectInfo);
+                var optimizationResult =
+                    await xamlOptimizer.OptimizeAsync(xamlFileProvider.XamlFiles, xamlPlatformInfo, projectInfo);
                 if (optimizationResult.IsSuccess)
                 {
                     this.Log.LogMessage(MessageImportance.Normal, LogMessages.ItemsOptimized, xamlOptimizer.GetType().Name, stopwatch.Elapsed);
@@ -473,10 +503,13 @@ public sealed class XamlOptimizerTask : Task
                 this.ReportDiagnostics(optimizationResult.XamlDiagnostics, xamlOptimizer);
                 return optimizationResult;
             }
+            catch (AggregateException aggregateException)
+            {
+                throw new XamlOptimizerException(xamlOptimizer.GetType(), aggregateException, aggregateException.Flatten().InnerExceptions);
+            }
             catch (Exception e)
             {
-                this.Log.LogErrorFromException(e);
-                throw;
+                throw new XamlOptimizerException(xamlOptimizer.GetType(), e, []);
             }
         }).Result;
 
@@ -548,6 +581,14 @@ public sealed class XamlOptimizerTask : Task
         this.NewMauiXaml = newItems.MauiXamlItems.ToArray();
         this.NewEmbeddedResources = newItems.EmbeddedResourceItems.ToArray();
         this.NewAdditionalFiles = newItems.AdditionalFileItems.ToArray();
+    }
+
+    private void LogXamlOptimizerException(XamlOptimizerException xamlOptimizerException)
+    {
+        if (xamlOptimizerException.InnerExceptions.HasAny)
+        {
+            xamlOptimizerException.InnerExceptions.ForEach(x => this.Log.LogErrorFromException(x, true, true, null));
+        }
     }
 
     private void ReportDiagnostics(IReadOnlyCollection<XamlDiagnostic> xamlDiagnostics, IXamlOptimizer xamlOptimizer)

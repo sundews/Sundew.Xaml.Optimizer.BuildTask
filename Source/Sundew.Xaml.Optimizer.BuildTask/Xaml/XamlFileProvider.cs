@@ -21,14 +21,15 @@ public class XamlFileProvider : IXamlFileProvider
 {
     /// <summary>Initializes a new instance of the <see cref="XamlFileProvider"/> class.</summary>
     /// <param name="xamlFiles">The file references.</param>
-    public XamlFileProvider(IReadOnlyList<XamlFile> xamlFiles)
+    /// <param name="maxParallelization">The max parallelization.</param>
+    public XamlFileProvider(IReadOnlyList<XamlFile> xamlFiles, int maxParallelization)
     {
-        this.XamlFiles = xamlFiles;
+        this.XamlFiles = new XamlFiles(xamlFiles, maxParallelization);
     }
 
     /// <summary>Gets the file references.</summary>
     /// <value>The file references.</value>
-    public IReadOnlyList<XamlFile> XamlFiles { get; }
+    public XamlFiles XamlFiles { get; }
 
     /// <summary>
     /// Load the xaml file.
