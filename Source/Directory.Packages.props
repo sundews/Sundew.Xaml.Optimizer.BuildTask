@@ -13,7 +13,7 @@
     <PackageVersion Include="StyleCop.Analyzers.Unstable" Version="1.2.0.556" />
     <PackageVersion Include="Sundew.Base" Version="15.0.0-u20251116-020129-ci" />
     <PackageVersion Include="Sundew.Packaging.Publish" Version="10.0.10-u20251005-144150-ci" />
-    <PackageVersion Include="Sundew.Xaml.Optimization" Version="3.0.0-u20251116-021731-ci" />
+    <PackageVersion Include="Sundew.Xaml.Optimization" Version="3.0.0-u20251116-224913-ci" />
     <PackageVersion Include="System.IO.Abstractions" Version="22.0.16" />
   </ItemGroup>
 </Project>
