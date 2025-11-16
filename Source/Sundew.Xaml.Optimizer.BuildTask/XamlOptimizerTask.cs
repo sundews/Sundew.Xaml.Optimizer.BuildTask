@@ -159,10 +159,15 @@ public sealed class XamlOptimizerTask : Task
     /// </summary>
     public bool UseMaui { get; set; }
 
-    /// <summary>Gets or sets a value indicating whether this <see cref="XamlOptimizerTask"/> is debug.</summary>
+    /// <summary>Gets or sets a value indicating whether this <see cref="XamlOptimizerTask"/> starts debugging before running.</summary>
     /// <value>
     ///   <c>true</c> if debug; otherwise, <c>false</c>.</value>
     public bool Debug { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether this <see cref="XamlOptimizerTask"/> starts debugging on error.</summary>
+    /// <value>
+    ///   <c>true</c> if debug; otherwise, <c>false</c>.</value>
+    public bool DebugOnError { get; set; }
 
     /// <summary>Gets or sets the max parallelization.</summary>
     public string? MaxParallelization { get; set; }
@@ -505,10 +510,14 @@ public sealed class XamlOptimizerTask : Task
             }
             catch (AggregateException aggregateException)
             {
+                this.AttachDebuggerIfRequested();
+
                 throw new XamlOptimizerException(xamlOptimizer.GetType(), aggregateException, aggregateException.Flatten().InnerExceptions);
             }
             catch (Exception e)
             {
+                this.AttachDebuggerIfRequested();
+
                 throw new XamlOptimizerException(xamlOptimizer.GetType(), e, []);
             }
         }).Result;
@@ -542,18 +551,20 @@ public sealed class XamlOptimizerTask : Task
 
                     break;
                 case XamlFileAction.Update:
-                    var evaluatedPath = GetLinkPath(xamlFileChange.File.Reference);
+                    const string parentDirectory = "..";
+                    var linkPath = GetLinkPath(xamlFileChange.File.Reference);
+                    var optimizedPath = linkPath.Replace(parentDirectory, string.Empty);
                     var optimizedXamlFilePath = XamlWriter.Save(
                         xamlFileChange.File.Document,
                         intermediateDirectory.FullName,
-                        evaluatedPath,
+                        optimizedPath,
                         xamlFileChange.File.LineEndings);
                     if (xamlFileChange.File.Reference is TaskItemFileReference taskItemFileReference)
                     {
                         var oldTaskItem = taskItemFileReference.TaskItem;
                         var optimizedTaskItem = new TaskItem(optimizedXamlFilePath);
                         oldTaskItem.CopyMetadataTo(optimizedTaskItem);
-                        optimizedTaskItem.SetMetadata(MetadataNames.Link, evaluatedPath);
+                        optimizedTaskItem.SetMetadata(MetadataNames.Link, linkPath);
                         var taskItems = GetTaskItems(xamlFileChange, applicationXamlTaskItems);
                         if (taskItems.HasValue)
                         {
@@ -581,6 +592,14 @@ public sealed class XamlOptimizerTask : Task
         this.NewMauiXaml = newItems.MauiXamlItems.ToArray();
         this.NewEmbeddedResources = newItems.EmbeddedResourceItems.ToArray();
         this.NewAdditionalFiles = newItems.AdditionalFileItems.ToArray();
+    }
+
+    private void AttachDebuggerIfRequested()
+    {
+        if (this.DebugOnError)
+        {
+            Debugger.Launch();
+        }
     }
 
     private void LogXamlOptimizerException(XamlOptimizerException xamlOptimizerException)

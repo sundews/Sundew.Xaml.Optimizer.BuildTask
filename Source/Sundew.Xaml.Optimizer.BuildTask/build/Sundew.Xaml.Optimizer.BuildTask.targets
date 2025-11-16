@@ -18,8 +18,8 @@
       <Output TaskParameter="Include" ItemName="EmbeddedXamlResource"/>
     </CreateItem>
     <XamlOptimizerTask
-	  TreatWarningsAsErrors="$(TreatWarningsAsErrors)"
-	  Optimizers="@(Sxo)"
+	    TreatWarningsAsErrors="$(TreatWarningsAsErrors)"
+	    Optimizers="@(Sxo)"
       ReferencePaths="@(ReferencePath)"
       PackageReferences="@(PackageReference)"
       TargetPlatformIdentifier="$(TargetPlatformIdentifier)"
@@ -38,21 +38,22 @@
       UseWPF="$(UseWPF)"
       UseMaui="$(UseMaui)"
       Debug="$(DefineConstants.Contains('DEBUG_SXO'))"
-	  MaxParallelization="$(Sxo_MaxParallelization)">
-	  <Output ItemName="ObsoletePages" TaskParameter="ObsoletePages"/>
-	  <Output ItemName="OptimizedPages" TaskParameter="OptimizedPages"/>
-	  <Output ItemName="ObsoleteAvaloniaXaml" TaskParameter="ObsoleteAvaloniaXaml"/>
+      DebugOnError="$(DefineConstants.Contains('DEBUG_SXO_ON_ERROR'))"
+	    MaxParallelization="$(Sxo_MaxParallelization)">
+      <Output ItemName="ObsoletePages" TaskParameter="ObsoletePages"/>
+	    <Output ItemName="OptimizedPages" TaskParameter="OptimizedPages"/>
+	    <Output ItemName="ObsoleteAvaloniaXaml" TaskParameter="ObsoleteAvaloniaXaml"/>
       <Output ItemName="OptimizedAvaloniaXaml" TaskParameter="OptimizedAvaloniaXaml"/>
-	  <Output ItemName="ObsoleteMauiXaml" TaskParameter="ObsoleteMauiXaml"/>
-	  <Output ItemName="OptimizedMauiXaml" TaskParameter="OptimizedMauiXaml"/>
+	    <Output ItemName="ObsoleteMauiXaml" TaskParameter="ObsoleteMauiXaml"/>
+	    <Output ItemName="OptimizedMauiXaml" TaskParameter="OptimizedMauiXaml"/>
       <Output ItemName="ObsoleteEmbeddedXamlResources" TaskParameter="ObsoleteEmbeddedXamlResources"/>
       <Output ItemName="OptimizedEmbeddedXamlResources" TaskParameter="OptimizedEmbeddedXamlResources"/>
       <Output ItemName="ObsoleteApplicationDefinitions" TaskParameter="ObsoleteApplicationDefinitions"/>
       <Output ItemName="OptimizedApplicationDefinitions" TaskParameter="OptimizedApplicationDefinitions"/>
-	  <Output ItemName="NewPages" TaskParameter="NewPages"/>
-	  <Output ItemName="NewAvaloniaXaml" TaskParameter="NewAvaloniaXaml"/>
-	  <Output ItemName="NewMauiXaml" TaskParameter="NewMauiXaml"/>
-	  <Output ItemName="NewEmbeddedResources" TaskParameter="NewEmbeddedResources"/>
+	    <Output ItemName="NewPages" TaskParameter="NewPages"/>
+	    <Output ItemName="NewAvaloniaXaml" TaskParameter="NewAvaloniaXaml"/>
+	    <Output ItemName="NewMauiXaml" TaskParameter="NewMauiXaml"/>
+	    <Output ItemName="NewEmbeddedResources" TaskParameter="NewEmbeddedResources"/>
       <Output ItemName="NewCompiles" TaskParameter="NewCompiles"/>
       <Output ItemName="NewAdditionalFiles" TaskParameter="NewAdditionalFiles"/>
     </XamlOptimizerTask>
