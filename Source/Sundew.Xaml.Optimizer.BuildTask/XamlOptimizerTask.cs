@@ -553,7 +553,7 @@ public sealed class XamlOptimizerTask : Task
                 case XamlFileAction.Update:
                     const string parentDirectory = "..";
                     var linkPath = GetLinkPath(xamlFileChange.File.Reference);
-                    var optimizedPath = linkPath.Replace(parentDirectory, string.Empty);
+                    var optimizedPath = linkPath.Replace(parentDirectory, string.Empty).TrimStart('\\', '/');
                     var optimizedXamlFilePath = XamlWriter.Save(
                         xamlFileChange.File.Document,
                         intermediateDirectory.FullName,
