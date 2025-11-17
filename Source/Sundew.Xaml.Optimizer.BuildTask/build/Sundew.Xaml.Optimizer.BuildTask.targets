@@ -37,7 +37,7 @@
       UseWinUI="$(UseWinUI)"
       UseWPF="$(UseWPF)"
       UseMaui="$(UseMaui)"
-      Debug="$(DefineConstants.Contains('DEBUG_SXO'))"
+      Debug="$(DefineConstants.Contains('DEBUG_SXO_TOOL'))"
       DebugOnError="$(DefineConstants.Contains('DEBUG_SXO_ON_ERROR'))"
 	    MaxParallelization="$(Sxo_MaxParallelization)">
       <Output ItemName="ObsoletePages" TaskParameter="ObsoletePages"/>
