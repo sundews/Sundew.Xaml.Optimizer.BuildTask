@@ -10,6 +10,7 @@ namespace Sundew.Xaml.Optimizer.BuildTask.Xaml;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using Sundew.Base;
@@ -42,9 +43,11 @@ public static class XamlWriter
         {
             OmitXmlDeclaration = xDocument.Declaration == null,
             NewLineChars = lineEnding,
-            NewLineHandling = NewLineHandling.Replace,
+            NewLineHandling = NewLineHandling.None,
             ConformanceLevel = xDocument.Declaration == null ? ConformanceLevel.Fragment : ConformanceLevel.Document,
             Indent = true,
+            CloseOutput = true,
+            Encoding = new UTF8Encoding(false),
         };
 
         using (var streamWriter = new StreamWriter(outputPath))
@@ -52,6 +55,7 @@ public static class XamlWriter
         using (var xmlWriter = XmlWriter.Create(rootElementAttributesLinePreserverXmlWriter, xmlWriterSettings))
         {
             xDocument.Save(xmlWriter);
+            xmlWriter.Flush();
         }
 
         return outputPath;

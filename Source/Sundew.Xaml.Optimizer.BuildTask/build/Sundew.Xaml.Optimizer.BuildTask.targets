@@ -58,15 +58,15 @@
       <Output ItemName="NewAdditionalFiles" TaskParameter="NewAdditionalFiles"/>
     </XamlOptimizerTask>
     <ItemGroup>
-	  <Page Remove="@(ObsoletePages)"/>
-	  <Page Include="@(OptimizedPages)"/>
-	  <FileWrites Include="@(OptimizedPages)"/>
-	  <AvaloniaXaml Remove="@(ObsoleteAvaloniaXaml)"/>
+	    <Page Remove="@(ObsoletePages)"/>
+	    <Page Include="@(OptimizedPages)"/>
+	    <FileWrites Include="@(OptimizedPages)"/>
+	    <AvaloniaXaml Remove="@(ObsoleteAvaloniaXaml)"/>
       <AvaloniaXaml Include="@(OptimizedAvaloniaXaml)"/>
-	  <FileWrites Include="@(ObsoleteAvaloniaXaml)"/>
-	  <MauiXaml Remove="@(ObsoleteMauiXaml)"/>
-	  <MauiXaml Include="@(OptimizedMauiXaml)"/>
-	  <FileWrites Include="@(OptimizedMauiXaml)"/>
+	    <FileWrites Include="@(ObsoleteAvaloniaXaml)"/>
+	    <MauiXaml Remove="@(ObsoleteMauiXaml)"/>
+	    <MauiXaml Include="@(OptimizedMauiXaml)"/>
+	    <FileWrites Include="@(OptimizedMauiXaml)"/>
       <EmbeddedResource Remove="@(ObsoleteEmbeddedXamlResources)"/>
       <EmbeddedResource Include="@(OptimizedEmbeddedXamlResources)"/>
       <FileWrites Include="@(OptimizedEmbeddedXamlResources)"/>
@@ -75,8 +75,8 @@
       <FileWrites Include="@(OptimizedApplicationDefinitions)"/>
       <AvaloniaXaml Include="@(NewAvaloniaXaml)"/>
       <FileWrites Include="@(NewAvaloniaXaml)"/>
-	  <MauiXaml Include="@(NewMauiXaml)"/>
-	  <FileWrites Include="@(NewMauiXaml)"/>
+	    <MauiXaml Include="@(NewMauiXaml)"/>
+	    <FileWrites Include="@(NewMauiXaml)"/>
       <Page Include="@(NewPages)"/>
       <FileWrites Include="@(NewPages)"/>
       <EmbeddedResource Include="@(NewEmbeddedResources)"/>

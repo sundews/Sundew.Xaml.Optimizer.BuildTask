@@ -319,6 +319,17 @@ public sealed class XamlOptimizerTask : Task
                     this.ReferencePaths,
                     (x, index) => new AssemblyReference(x));
             var intermediateDirectory = new DirectoryInfo(this.IntermediateOutputPath);
+            if (intermediateDirectory.Exists)
+            {
+                try
+                {
+                    intermediateDirectory.Delete(true);
+                }
+                catch (Exception)
+                {
+                }
+            }
+
             var sxoSettings = new SettingsProvider(logger).GetSettings(this.ProjectDirectory);
             var xamlOptimizerPaths = this.Optimizers
                 .Select(x => (x.ItemSpec, System.Reflection.AssemblyName.GetAssemblyName(x.ItemSpec))).ToArray();
@@ -527,8 +538,7 @@ public sealed class XamlOptimizerTask : Task
                 () => new List<TaskItemChanges>());
 
         var xamlFileChanges = new HashSet<XamlFileChange>(new XamlFileChangeIdentityEqualityComparer());
-        optimizationResults.Reverse();
-        foreach (var xamlFileChange in optimizationResults.SelectMany(x => x.XamlFileChanges))
+        foreach (var xamlFileChange in optimizationResults.Reverse().SelectMany(x => x.XamlFileChanges))
         {
             xamlFileChanges.Add(xamlFileChange);
         }
