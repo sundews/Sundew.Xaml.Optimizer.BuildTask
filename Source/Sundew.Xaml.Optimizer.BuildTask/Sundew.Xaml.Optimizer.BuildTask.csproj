@@ -51,6 +51,12 @@ https://github.com/sundews/Sundew.Xaml.Optimization
     <Folder Include="Properties\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Sundew.Xaml.Optimizer.BuildTask.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
   <Target Name="SetNuspecProperties" BeforeTargets="GenerateNuspec">
     <PropertyGroup>
       <NuspecProperties>$(NuspecProperties);company=$(Company);description=$(Description);copyright=$(Copyright);authors=$(Authors);version=$(PackageVersion);repositoryUrl=$(RepositoryUrl);releaseNotes=$(PackageReleaseNotes);repositoryType=$(RepositoryType);licenseExpression=$(PackageLicenseExpression);targetFramework=$(TargetFramework);configuration=$(Configuration);projectDir=$(MSBuildProjectDirectory);outputPath=$(OutputPath);packageFiles=$(IntermediateOutputPath)package;supportedOptimizationsVersions=$(SupportedOptimizationsVersions)</NuspecProperties>

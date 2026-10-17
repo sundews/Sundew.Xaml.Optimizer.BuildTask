@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- TUnit runs the test assembly itself through Microsoft.Testing.Platform. -->
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sundew.Xaml.Optimizer.BuildTask\Sundew.Xaml.Optimizer.BuildTask.csproj" />
+  </ItemGroup>
+
+</Project>

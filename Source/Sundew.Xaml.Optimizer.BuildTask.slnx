@@ -28,4 +28,8 @@
     <BuildType Solution="Ad-Hoc|*" Project="Release" />
     <BuildType Solution="AppStore|*" Project="Release" />
   </Project>
+  <Project Path="Sundew.Xaml.Optimizer.BuildTask.Tests/Sundew.Xaml.Optimizer.BuildTask.Tests.csproj">
+    <BuildType Solution="Ad-Hoc|*" Project="Release" />
+    <BuildType Solution="AppStore|*" Project="Release" />
+  </Project>
 </Solution>

@@ -39,15 +39,11 @@
     <AdditionalFiles Include="$(StyleCopJsonFile)" Link="stylecop.json"/>
   </ItemGroup>
 
+  <!-- TUnit builds on Microsoft.Testing.Platform, which global.json selects as the dotnet test runner.
+       Microsoft.NET.Test.Sdk belongs to VSTest and must not be referenced alongside it. -->
   <ItemGroup Condition="$(AssemblyName.EndsWith('Tests'))">
     <PackageReference Include="AwesomeAssertions" />
-    <PackageReference Include="coverlet.collector" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio" >
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="TUnit" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
