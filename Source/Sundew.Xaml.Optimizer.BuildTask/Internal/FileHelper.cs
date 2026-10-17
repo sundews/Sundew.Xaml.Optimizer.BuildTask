@@ -30,7 +30,8 @@ internal static class FileHelper
 
     public static async Task WriteAllTextAsync(string filePath, string content)
     {
-        using var fileStream = File.OpenWrite(filePath);
+        // FileMode.Create truncates, whereas File.OpenWrite would leave the tail of a longer previous content in place.
+        using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
         using var streamWriter = new StreamWriter(fileStream);
         await streamWriter.WriteAsync(content).ConfigureAwait(false);
     }

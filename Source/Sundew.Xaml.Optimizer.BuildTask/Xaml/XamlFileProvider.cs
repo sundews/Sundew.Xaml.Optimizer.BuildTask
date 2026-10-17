@@ -54,7 +54,7 @@ public class XamlFileProvider : IXamlFileProvider
         return new XamlFile(
             xDocument,
             fileReference,
-            LineEndingDetector.GetLineEnding(xDocument));
+            XamlWriter.LineEnding);
     }
 
     /// <summary>
@@ -70,7 +70,7 @@ public class XamlFileProvider : IXamlFileProvider
         return new TaskItemXamlFile(
             xDocument,
             taskItemFileReference,
-            LineEndingDetector.GetLineEnding(xDocument),
+            XamlWriter.LineEnding,
             taskItemFileReference.TaskItem);
     }
 }

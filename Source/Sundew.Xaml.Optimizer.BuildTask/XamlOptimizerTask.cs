@@ -91,13 +91,31 @@ public sealed class XamlOptimizerTask : Task
     public required string RootNamespace { get; set; }
 
     /// <summary>
-    /// Gets or sets the intermediate output path.
+    /// Gets or sets the intermediate output path, being the path the markup compiler resolves its generated files
+    /// against.
     /// </summary>
     /// <value>
     /// The intermediate output path.
     /// </value>
     [Required]
     public required string IntermediateOutputPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets the base intermediate output path, being the root of the staging directory.
+    /// </summary>
+    /// <value>
+    /// The base intermediate output path.
+    /// </value>
+    [Required]
+    public required string BaseIntermediateOutputPath { get; set; }
+
+    /// <summary>
+    /// Gets or sets the staging directory, overriding the directory the optimizer would otherwise derive.
+    /// </summary>
+    /// <value>
+    /// The staging directory.
+    /// </value>
+    public string? SxoIntermediateOutputPath { get; set; }
 
     /// <summary>
     /// Gets or sets the application definitions.
@@ -292,6 +310,13 @@ public sealed class XamlOptimizerTask : Task
     public ITaskItem[]? NewAdditionalFiles { get; private set; }
 
     /// <summary>
+    /// Gets a value indicating whether the set of optimized xaml files changed, in which case the markup compiler's
+    /// incremental state has to be discarded.
+    /// </summary>
+    [Output]
+    public bool MarkupCompileStateInvalidated { get; private set; }
+
+    /// <summary>
     /// Executes the xaml resource optimization.
     /// </summary>
     /// <returns>
@@ -318,15 +343,22 @@ public sealed class XamlOptimizerTask : Task
                 new TaskItemLazyList<AssemblyReference>(
                     this.ReferencePaths,
                     (x, index) => new AssemblyReference(x));
-            var intermediateDirectory = new DirectoryInfo(this.IntermediateOutputPath);
-            if (intermediateDirectory.Exists)
+            var (stagingDirectory, pivot) = StagingDirectoryProvider.Resolve(
+                this.ProjectDirectory,
+                this.BaseIntermediateOutputPath,
+                this.IntermediateOutputPath,
+                this.SxoIntermediateOutputPath);
+            this.Log.LogMessage(MessageImportance.Normal, LogMessages.StagingDirectoryResolved, pivot, stagingDirectory.FullName);
+            if (stagingDirectory.Exists)
             {
                 try
                 {
-                    intermediateDirectory.Delete(true);
+                    stagingDirectory.Delete(true);
                 }
-                catch (Exception)
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {
+                    // Leftovers in the staging directory are stale input for the markup compiler, so make the failure visible.
+                    this.Log.LogMessage(MessageImportance.High, LogMessages.StagingDirectoryNotCleaned, stagingDirectory.FullName, e.Message);
                 }
             }
 
@@ -343,11 +375,13 @@ public sealed class XamlOptimizerTask : Task
                     xamlOptimizerFactory,
                     compiles,
                     assemblyReferences,
-                    intermediateDirectory,
+                    stagingDirectory,
                     sxoSettings,
                     xamlOptimizerPaths,
                     assemblyResolver);
             }
+
+            this.EvictOrphanedMarkupCompileOutput(stagingDirectory);
         }
         catch (XamlOptimizerException e)
         {
@@ -457,7 +491,7 @@ public sealed class XamlOptimizerTask : Task
         XamlOptimizerFactory xamlOptimizerFactory,
         TaskItemLazyList<TaskItemFileReference> compiles,
         TaskItemLazyList<AssemblyReference> assemblyReferences,
-        DirectoryInfo intermediateDirectory,
+        DirectoryInfo stagingDirectory,
         IReadOnlyCollection<SxoSettings> sxoSettings,
         IReadOnlyList<(string Path, AssemblyName AssemblyName)> xamlOptimizerAssemblies,
         AssemblyResolver assemblyResolver)
@@ -494,7 +528,7 @@ public sealed class XamlOptimizerTask : Task
                     applicationXamlItems.ApplicationDefinition),
             this.MaxParallelization.HasValue && int.TryParse(this.MaxParallelization, out var maxParallelization) ? maxParallelization : Environment.ProcessorCount);
 
-        var projectInfo = new ProjectInfo(this.AssemblyName, this.RootNamespace, new DirectoryInfo(this.ProjectDirectory), new DirectoryInfo(this.SolutionDirectory), intermediateDirectory, assemblyReferences, compiles, xamlFileProvider, this.Debug);
+        var projectInfo = new ProjectInfo(this.AssemblyName, this.RootNamespace, new DirectoryInfo(this.ProjectDirectory), new DirectoryInfo(this.SolutionDirectory), stagingDirectory, assemblyReferences, compiles, xamlFileProvider, this.Debug);
         var xamlOptimizers = xamlOptimizerFactory
             .CreateXamlOptimizers(assemblyResolver, xamlPlatformInfo, xamlOptimizerAssemblies, sxoSettings)
             .ToArray();
@@ -566,9 +600,8 @@ public sealed class XamlOptimizerTask : Task
                     var optimizedPath = linkPath.Replace(parentDirectory, string.Empty).TrimStart('\\', '/');
                     var optimizedXamlFilePath = XamlWriter.Save(
                         xamlFileChange.File.Document,
-                        intermediateDirectory.FullName,
-                        optimizedPath,
-                        xamlFileChange.File.LineEndings);
+                        stagingDirectory.FullName,
+                        optimizedPath);
                     if (xamlFileChange.File.Reference is TaskItemFileReference taskItemFileReference)
                     {
                         var oldTaskItem = taskItemFileReference.TaskItem;
@@ -602,6 +635,29 @@ public sealed class XamlOptimizerTask : Task
         this.NewMauiXaml = newItems.MauiXamlItems.ToArray();
         this.NewEmbeddedResources = newItems.EmbeddedResourceItems.ToArray();
         this.NewAdditionalFiles = newItems.AdditionalFileItems.ToArray();
+    }
+
+    private void EvictOrphanedMarkupCompileOutput(DirectoryInfo stagingDirectory)
+    {
+        var obsoleteStagingDirectory = StagingDirectoryProvider.GetObsoleteDirectory(this.IntermediateOutputPath);
+        if (string.Equals(
+                obsoleteStagingDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                stagingDirectory.FullName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            obsoleteStagingDirectory = null;
+        }
+
+        // Only the items the markup compiler consumes are tracked, as they are the ones it generates baml and code for.
+        var stagedFilePaths = (this.OptimizedPages ?? [])
+            .Concat(this.OptimizedApplicationDefinitions ?? [])
+            .Concat(this.NewPages ?? [])
+            .Select(x => x.ItemSpec);
+
+        var stateFilePath = Path.Combine(this.IntermediateOutputPath, "sxo.filelist");
+        this.MarkupCompileStateInvalidated =
+            new MarkupCompileStateTracker(stateFilePath, this.ProjectDirectory, this.IntermediateOutputPath, this.Log)
+                .Evict(stagedFilePaths, obsoleteStagingDirectory);
     }
 
     private void AttachDebuggerIfRequested()

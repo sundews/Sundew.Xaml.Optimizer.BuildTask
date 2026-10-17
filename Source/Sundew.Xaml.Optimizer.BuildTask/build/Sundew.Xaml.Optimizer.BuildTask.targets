@@ -14,6 +14,18 @@
 
   <Target Name="OptimizeXamlResources" BeforeTargets="XamlMarkupCompilePass1;MarkupCompilePass1;_FindXamlGFiles;PrepareToCompileAvaloniaXaml"
           Condition="!$(DefineConstants.Contains('DISABLE_SXO')) AND $(DesignTimeBuild) != true AND $(BuildingProject) == true">
+    <!--
+        The markup compiler resolves its generated files as $(IntermediateOutputPath) combined with the path of the xaml
+        file relative to the project directory, so every character of the staging directory is repeated in the path of
+        every generated file. The optimizer therefore derives a short staging directory below
+        $(BaseIntermediateOutputPath), which also keeps the staged xaml out of the default item globs and within reach of
+        Clean. Set $(SxoIntermediateOutputPath) to stage somewhere else.
+    -->
+    <PropertyGroup>
+      <_SxoIntermediateOutputPath>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)'))))</_SxoIntermediateOutputPath>
+      <_SxoBaseIntermediateOutputPath>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)'))))</_SxoBaseIntermediateOutputPath>
+      <_SxoStagingPath Condition="'$(SxoIntermediateOutputPath)' != ''">$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(SxoIntermediateOutputPath)'))))</_SxoStagingPath>
+    </PropertyGroup>
     <CreateItem Include="@(EmbeddedResource)" Condition="'%(Extension)' == '.xaml'">
       <Output TaskParameter="Include" ItemName="EmbeddedXamlResource"/>
     </CreateItem>
@@ -32,7 +44,9 @@
       ProjectDirectory="$(MSBuildProjectDirectory)"
       AssemblyName="$(AssemblyName)"
       RootNamespace="$(RootNamespace)"
-      IntermediateOutputPath="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)\sxo"
+      IntermediateOutputPath="$(_SxoIntermediateOutputPath)"
+      BaseIntermediateOutputPath="$(_SxoBaseIntermediateOutputPath)"
+      SxoIntermediateOutputPath="$(_SxoStagingPath)"
       SolutionDirectory="$(SolutionDir)"
       UseWinUI="$(UseWinUI)"
       UseWPF="$(UseWPF)"
@@ -56,8 +70,22 @@
 	    <Output ItemName="NewEmbeddedResources" TaskParameter="NewEmbeddedResources"/>
       <Output ItemName="NewCompiles" TaskParameter="NewCompiles"/>
       <Output ItemName="NewAdditionalFiles" TaskParameter="NewAdditionalFiles"/>
+      <Output PropertyName="_SxoMarkupCompileStateInvalidated" TaskParameter="MarkupCompileStateInvalidated"/>
     </XamlOptimizerTask>
+    <!--
+        The markup compiler keys its incremental state to the xaml files of the previous build and only recompiles pages
+        with local types when that set changes, so a moved xaml file leaves it describing files that are no longer there.
+        Discarding the state forces a full markup compile pass, so that what it hands to ResourcesGenerator matches disk.
+    -->
+    <ItemGroup Condition="'$(_SxoMarkupCompileStateInvalidated)' == 'true' AND '$(AssemblyName)' != ''">
+      <_SxoObsoleteMarkupCompileState Include="$(_SxoIntermediateOutputPath)$(AssemblyName)_MarkupCompile.cache"/>
+      <_SxoObsoleteMarkupCompileState Include="$(_SxoIntermediateOutputPath)$(AssemblyName)_MarkupCompile.i.cache"/>
+      <_SxoObsoleteMarkupCompileState Include="$(_SxoIntermediateOutputPath)$(AssemblyName)_MarkupCompile.lref"/>
+      <_SxoObsoleteMarkupCompileState Include="$(_SxoIntermediateOutputPath)$(AssemblyName)_MarkupCompile.i.lref"/>
+    </ItemGroup>
+    <Delete Files="@(_SxoObsoleteMarkupCompileState)" ContinueOnError="true" Condition="'@(_SxoObsoleteMarkupCompileState)' != ''"/>
     <ItemGroup>
+      <FileWrites Include="$(_SxoIntermediateOutputPath)sxo.filelist"/>
 	    <Page Remove="@(ObsoletePages)"/>
 	    <Page Include="@(OptimizedPages)"/>
 	    <FileWrites Include="@(OptimizedPages)"/>

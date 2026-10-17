@@ -21,16 +21,23 @@ using Sundew.Base;
 public static class XamlWriter
 {
     /// <summary>
+    /// The line ending used by the staged xaml.
+    /// <see cref="XDocument"/> normalizes all line endings to a line feed while parsing, as the xml specification
+    /// requires, so the line endings of the original file cannot be recovered from the document. The staged xaml is
+    /// compiler input rather than source, so it is written with line feeds throughout instead.
+    /// </summary>
+    public const string LineEnding = "\n";
+
+    /// <summary>
     /// Optimizes the xaml.
     /// </summary>
     /// <param name="xDocument">The x document.</param>
     /// <param name="sxoDirectory">The sxo directory.</param>
     /// <param name="inputIdentity">The input identity.</param>
-    /// <param name="lineEnding">The line ending.</param>
     /// <returns>
     /// The output file path.
     /// </returns>
-    public static string Save(XDocument xDocument, string sxoDirectory, string inputIdentity, string lineEnding)
+    public static string Save(XDocument xDocument, string sxoDirectory, string inputIdentity)
     {
         var outputPath = Path.Combine(sxoDirectory, inputIdentity);
         var directory = Path.GetDirectoryName(outputPath);
@@ -42,7 +49,7 @@ public static class XamlWriter
         var xmlWriterSettings = new XmlWriterSettings
         {
             OmitXmlDeclaration = xDocument.Declaration == null,
-            NewLineChars = lineEnding,
+            NewLineChars = LineEnding,
             NewLineHandling = NewLineHandling.None,
             ConformanceLevel = xDocument.Declaration == null ? ConformanceLevel.Fragment : ConformanceLevel.Document,
             Indent = true,
